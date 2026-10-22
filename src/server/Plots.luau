@@ -159,7 +159,7 @@ local function buildPlot(index: number): Plot
 
 	-- Tiled floor on a stone curb
 	part({ Name = "Curb", Size = Vector3.new(PLOT_WIDTH + 2, 2.5, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(0, -0.75, 0), Color = Color3.fromRGB(165, 160, 155), Material = Enum.Material.Cobblestone, Parent = model })
-	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = Color3.fromRGB(215, 175, 130), Material = Enum.Material.WoodPlanks, Parent = model })
+	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = Color3.fromRGB(190, 160, 125), Material = Enum.Material.WoodPlanks, Parent = model })
 
 	-- Fence on the sides and at the back; the front, facing the plaza, stays open
 	local halfW, halfD = PLOT_WIDTH / 2 + 0.5, PLOT_DEPTH / 2 + 0.5
