@@ -57,7 +57,9 @@ To save progress between tests, turn on **Game Settings > Security > Enable Stud
 
 ## The brainrot models
 
-The 3D models come from the Creator Store (30 of the 36 cards have one, listed in `Config.ASSETS`). Cards without a model only show the card on their stand. The plaza decoration (fountain, stalls, lamps, trees, benches, flowers) also comes from the Creator Store (`Config.DECOR`); a missing model is replaced by a simple shape. Like in Speed Escape, the models have to be saved into the place once (run it again after an update that adds models: it only adds the missing ones):
+The 3D models come from the Creator Store (30 of the 36 cards have one, listed in `Config.ASSETS`). Cards without a model only show the card on their stand. The look follows the big Roblox simulators (Steal a Brainrot, Grow a Garden): bright plastic colors, a studded green baseplate, a colored base per player (`Config.PLOT_COLORS`), a cyan cartoon sky (`Config.SKY`) and big floating labels.
+
+The plaza decoration (fountain, stalls, lamps, trees, benches, flowers) also comes from the Creator Store (`Config.DECOR`); a missing model is replaced by a simple shape. Like in Speed Escape, the models have to be saved into the place once (run it again after an update that adds models: it only adds the missing ones):
 
 1. Open the place in Studio (edit mode, not Play), with Rojo connected.
 2. Open **View > Command Bar**, paste the whole content of [`tools/import-assets.lua`](tools/import-assets.lua) and press Enter.

@@ -1,4 +1,4 @@
--- The map: ground, spawn in the middle and one plot per player around it
+-- The map: spawn in the middle and one plot per player around it
 -- (the plaza in the middle is built by Plaza.luau).
 -- Each plot has Config.STAND_COUNT stands that show the cards the player placed on them.
 
@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local CardArt = require(ReplicatedStorage.Shared.CardArt)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Assets = require(script.Parent.Assets)
 
@@ -15,9 +16,11 @@ local PLOT_COUNT = 6 -- server size
 local PLOT_RADIUS = 78 -- distance from the middle of the map
 local PLOT_WIDTH = 46
 local PLOT_DEPTH = 38
+local MODEL_MAX_DEPTH = 7 -- deeper brainrot models are shrunk to fit behind the card
+local MODEL_MAX_WIDTH = 8 -- and wider ones so they don't reach the next stand (10 studs apart)
 local FONT = Enum.Font.FredokaOne
 
-type Stand = { base: BasePart, display: Model, key: string? }
+type Stand = { base: BasePart, ring: BasePart, light: PointLight, display: Model, key: string?, color: Color3, lift: number }
 type Plot = { index: number, cframe: CFrame, model: Model, owner: Player?, stands: { Stand }, sign: TextLabel, income: TextLabel }
 
 local plots: { Plot } = {}
@@ -47,7 +50,7 @@ local function label(parent: Instance, props): TextLabel
 		(l :: any)[key] = value
 	end
 	local outline = Instance.new("UIStroke")
-	outline.Thickness = 2
+	outline.Thickness = 3
 	outline.Parent = l
 	l.Parent = parent
 	return l
@@ -67,8 +70,6 @@ end
 -- Building the map
 ---------------------------------------------------------------------------
 local function buildCenter()
-	part({ Name = "Ground", Size = Vector3.new(420, 2, 420), Position = Vector3.new(0, -1, 0), Color = Color3.fromRGB(95, 185, 95), Material = Enum.Material.Grass, Parent = mapFolder })
-
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Anchored = true
 	spawn.Size = Vector3.new(10, 1, 10)
@@ -80,29 +81,38 @@ local function buildCenter()
 	spawn.Parent = mapFolder
 
 	-- Big floating title in the middle
-	local anchor = part({ Name = "Title", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 28, 0), Transparency = 1, CanCollide = false, CanQuery = false, Parent = mapFolder })
+	local anchor = part({ Name = "Title", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 42, 0), Transparency = 1, CanCollide = false, CanQuery = false, Parent = mapFolder })
 	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.fromScale(40, 10)
+	billboard.Size = UDim2.fromScale(30, 7.5)
 	billboard.LightInfluence = 0
 	billboard.MaxDistance = 400
 	billboard.Parent = anchor
 	label(billboard, { Size = UDim2.fromScale(1, 1), Text = "COLLECT BRAINROT CARDS", TextColor3 = Color3.fromRGB(255, 220, 90) })
 end
 
-local function buildStand(plotModel: Model, cframe: CFrame): Stand
+-- A square podium in the plot's color, with a strip that glows with the card's rarity
+local function buildStand(plotModel: Model, cframe: CFrame, color: Color3, lift: number): Stand
+	-- Invisible block: the stand's position for the card, the model and the floating info
 	local base = part({
 		Name = "Stand",
 		Size = Vector3.new(7, 1.6, 6),
 		CFrame = cframe * CFrame.new(0, 0.8, 0),
-		Color = Color3.fromRGB(60, 60, 80),
-		Material = Enum.Material.SmoothPlastic,
+		Transparency = 1,
 		Parent = plotModel,
 	})
-	part({ Name = "Trim", Size = Vector3.new(7.3, 0.3, 6.3), CFrame = base.CFrame * CFrame.new(0, 0.85, 0), Color = Color3.fromRGB(255, 210, 80), Material = Enum.Material.Neon, CanCollide = false, Parent = plotModel })
+	part({ Name = "Podium", Size = Vector3.new(7, 1.3, 6), CFrame = cframe * CFrame.new(0, 0.65, 0), Color = color:Lerp(Color3.new(0, 0, 0), 0.3), Material = Enum.Material.SmoothPlastic, Parent = plotModel })
+	part({ Name = "Top", Size = Vector3.new(6.4, 0.3, 5.4), CFrame = cframe * CFrame.new(0, 1.45, 0), Color = Color3.fromRGB(245, 245, 250), Material = Enum.Material.SmoothPlastic, Parent = plotModel })
+	local ring = part({ Name = "Ring", Size = Vector3.new(7.3, 0.25, 6.3), CFrame = cframe * CFrame.new(0, 1.3, 0), Color = color:Lerp(Color3.new(1, 1, 1), 0.4), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = plotModel })
+	local light = Instance.new("PointLight")
+	light.Range = 10
+	light.Brightness = 1.5
+	light.Shadows = false
+	light.Enabled = false
+	light.Parent = ring
 	local display = Instance.new("Model")
 	display.Name = "Display"
 	display.Parent = plotModel
-	return { base = base, display = display, key = nil }
+	return { base = base, ring = ring, light = light, display = display, key = nil, color = color, lift = lift }
 end
 
 local function buildPlot(index: number): Plot
@@ -110,22 +120,69 @@ local function buildPlot(index: number): Plot
 	local position = Vector3.new(math.cos(angle) * PLOT_RADIUS, 0, math.sin(angle) * PLOT_RADIUS)
 	-- -Z of the plot faces the middle of the map
 	local cframe = CFrame.lookAt(position, Vector3.zero)
+	local color = Config.PLOT_COLORS[(index - 1) % #Config.PLOT_COLORS + 1]
+	local white = Color3.fromRGB(248, 248, 252)
 
 	local model = Instance.new("Model")
 	model.Name = "Plot" .. index
 	model.Parent = mapFolder
 
-	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = Color3.fromRGB(240, 235, 220), Material = Enum.Material.WoodPlanks, Parent = model })
+	-- Studded floor in a slightly lighter shade of the plot's color, on a base in the plot's color
+	part({ Name = "Curb", Size = Vector3.new(PLOT_WIDTH + 2, 2.5, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(0, -0.75, 0), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
+	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = color:Lerp(white, 0.2), Material = Enum.Material.Plastic, TopSurface = Enum.SurfaceType.Studs, Parent = model })
+
+	-- Low walls on the sides with a white trim; the front, facing the plaza, stays open
+	local halfW, halfD = PLOT_WIDTH / 2 + 0.25, PLOT_DEPTH / 2 + 0.25
 	for _, side in { -1, 1 } do
-		part({ Name = "Border", Size = Vector3.new(1, 1.4, PLOT_DEPTH), CFrame = cframe * CFrame.new(side * (PLOT_WIDTH / 2 - 0.5), 0.7, 0), Color = Color3.fromRGB(150, 110, 70), Material = Enum.Material.Wood, Parent = model })
+		part({ Name = "Wall", Size = Vector3.new(1.5, 4, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(side * halfW, 2.5, 0), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
+		part({ Name = "Trim", Size = Vector3.new(1.9, 0.6, PLOT_DEPTH + 2.4), CFrame = cframe * CFrame.new(side * halfW, 4.8, 0), Color = white, Material = Enum.Material.SmoothPlastic, Parent = model })
+	end
+	-- Back wall: a tall facade that carries the owner's sign, high above the stands' labels
+	part({ Name = "BackWall", Size = Vector3.new(PLOT_WIDTH + 3, 24, 1.5), CFrame = cframe * CFrame.new(0, 12.5, halfD), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
+	part({ Name = "BackTrim", Size = Vector3.new(PLOT_WIDTH + 3.4, 0.8, 1.9), CFrame = cframe * CFrame.new(0, 24.6, halfD), Color = white, Material = Enum.Material.SmoothPlastic, Parent = model })
+	for _, x in { -1, 1 } do
+		part({ Name = "Pillar", Size = Vector3.new(2.2, 25, 2.2), CFrame = cframe * CFrame.new(x * (PLOT_WIDTH / 2 + 0.5), 12.6, halfD), Color = color:Lerp(Color3.new(0, 0, 0), 0.25), Material = Enum.Material.SmoothPlastic, Parent = model })
 	end
 
-	-- Owner sign at the back, facing the middle
-	local board = part({ Name = "Sign", Size = Vector3.new(22, 7, 1), CFrame = cframe * CFrame.new(0, 7, PLOT_DEPTH / 2 - 1), Color = Color3.fromRGB(45, 45, 65), Parent = model })
-	part({ Name = "Post", Size = Vector3.new(1, 4, 1), CFrame = cframe * CFrame.new(0, 2, PLOT_DEPTH / 2 - 1), Color = Color3.fromRGB(120, 90, 60), Parent = model })
+	-- Bushes in the back corners, flowers at the front
+	for _, side in { -1, 1 } do
+		for i, size in { 5, 3.6 } do
+			part({
+				Name = "Bush",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(size, size, size),
+				CFrame = cframe * CFrame.new(side * (PLOT_WIDTH / 2 - 2.5 - (i - 1) * 3.4), 0.6 + size * 0.35, PLOT_DEPTH / 2 - 2.5 - (i - 1) * 1.5),
+				Color = Color3.fromRGB(60, 190, 70),
+				Material = Enum.Material.SmoothPlastic,
+				Parent = model,
+			})
+		end
+		Assets.place("decor_flowers", model, (cframe * CFrame.new(side * (PLOT_WIDTH / 2 - 2.5), 0.6, -PLOT_DEPTH / 2 + 2.5)).Position)
+	end
+
+	-- Owner sign on the facade: a light board with dark text, like a shop sign
+	local signCFrame = cframe * CFrame.new(0, 19.5, halfD - 1)
+	part({ Name = "SignFrame", Size = Vector3.new(25, 7.6, 0.6), CFrame = signCFrame * CFrame.new(0, 0, 0.1), Color = Color3.fromRGB(120, 80, 50), Material = Enum.Material.SmoothPlastic, Parent = model })
+	local board = part({ Name = "Sign", Size = Vector3.new(24, 6.6, 0.6), CFrame = signCFrame * CFrame.new(0, 0, -0.1), Color = Color3.fromRGB(245, 230, 195), Material = Enum.Material.SmoothPlastic, Parent = model })
 	local gui = surfaceGui(board, Enum.NormalId.Front, 30)
-	local sign = label(gui, { Position = UDim2.fromScale(0.05, 0.08), Size = UDim2.fromScale(0.9, 0.5), Text = "Free plot" })
-	local income = label(gui, { Position = UDim2.fromScale(0.05, 0.6), Size = UDim2.fromScale(0.9, 0.32), Text = "", TextColor3 = Color3.fromRGB(120, 255, 140) })
+	local sign = label(gui, { Position = UDim2.fromScale(0.04, 0.1), Size = UDim2.fromScale(0.92, 0.8), Text = "Free Base", TextColor3 = Color3.fromRGB(110, 70, 40) })
+	local signStroke = sign:FindFirstChildOfClass("UIStroke")
+	if signStroke then
+		signStroke:Destroy()
+	end
+
+	-- Huge income counter floating above the base
+	local anchor = part({ Name = "IncomeAnchor", Size = Vector3.new(1, 1, 1), CFrame = cframe * CFrame.new(0, 27, halfD), Transparency = 1, CanCollide = false, CanQuery = false, Parent = model })
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.fromScale(30, 6)
+	billboard.LightInfluence = 0
+	billboard.MaxDistance = 300
+	billboard.Parent = anchor
+	local income = label(billboard, { Size = UDim2.fromScale(1, 1), Text = "", TextColor3 = Color3.new(1, 1, 1) })
+	local incomeStroke = income:FindFirstChildOfClass("UIStroke")
+	if incomeStroke then
+		incomeStroke.Thickness = 4
+	end
 
 	-- Two rows of stands
 	local stands = {}
@@ -135,7 +192,8 @@ local function buildPlot(index: number): Plot
 		local column = (slot - 1) % perRow
 		local x = (column - (perRow - 1) / 2) * 10
 		local z = -6 + row * 13
-		stands[slot] = buildStand(model, cframe * CFrame.new(x, 0.6, z))
+		-- The back row's labels float a bit higher, so they don't sit behind the front row's
+		stands[slot] = buildStand(model, cframe * CFrame.new(x, 0.6, z), color, row * 2)
 	end
 
 	return { index = index, cframe = cframe, model = model, owner = nil, stands = stands, sign = sign, income = income }
@@ -159,77 +217,92 @@ end
 ---------------------------------------------------------------------------
 -- What a stand shows
 ---------------------------------------------------------------------------
-local function variantLook(card: Part, gui: SurfaceGui, variantId: string)
-	if variantId == "gold" then
-		card.Color = Color3.fromRGB(255, 200, 50)
-		card.Material = Enum.Material.Foil
-	elseif variantId == "rainbow" then
-		local background = Instance.new("Frame")
-		background.Size = UDim2.fromScale(1, 1)
-		background.ZIndex = 0
-		background.BackgroundColor3 = Color3.new(1, 1, 1)
-		background.Parent = gui
-		local gradient = Instance.new("UIGradient")
-		gradient.Rotation = 45
-		gradient.Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
-			ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 220, 80)),
-			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 230, 120)),
-			ColorSequenceKeypoint.new(0.75, Color3.fromRGB(80, 160, 255)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 90, 255)),
-		})
-		gradient.Parent = background
-	elseif variantId == "holo" then
-		card.Color = Color3.fromRGB(120, 255, 240)
-		card.Material = Enum.Material.Neon
-		local sparkles = Instance.new("Sparkles")
-		sparkles.SparkleColor = Color3.fromRGB(200, 255, 255)
-		sparkles.Parent = card
-	end
-end
-
 local function showCard(stand: Stand, key: string)
 	local cardId, variantId = Config.splitKey(key)
 	local card = Config.CARDS[cardId]
 	local rarity = Config.RARITY[card.rarity]
 	local variant = Config.VARIANT[variantId] or Config.NORMAL_VARIANT
+	local grade = Config.keyGrade(key)
+	local color = if variantId == "normal" then rarity.color else variant.color
 	local top = stand.base.CFrame * CFrame.new(0, stand.base.Size.Y / 2, 0)
 
-	-- The card itself, standing at the front of the stand
+	-- The pedestal's ring glows with the card's color
+	stand.ring.Color = color
+	stand.ring.Material = Enum.Material.Neon
+	stand.light.Color = color
+	stand.light.Enabled = true
+
+	-- The card itself, standing at the front of the pedestal
 	local cardPart = part({
 		Name = "Card",
-		Size = Vector3.new(3.2, 4.4, 0.25),
-		CFrame = top * CFrame.new(0, 2.5, -1.9) * CFrame.Angles(math.rad(-12), 0, 0),
-		Color = rarity.color,
-		Material = Enum.Material.SmoothPlastic,
+		Size = Vector3.new(3, 4.2, 0.12),
+		CFrame = top * CFrame.new(0, 2.4, -2.1) * CFrame.Angles(math.rad(-12), 0, 0),
+		Transparency = 1,
 		CanCollide = false,
+		CanQuery = false,
 		Parent = stand.display,
 	})
 	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
-		local gui = surfaceGui(cardPart, face, 60)
-		variantLook(cardPart, gui, variantId)
-		label(gui, { Position = UDim2.fromScale(0.06, 0.06), Size = UDim2.fromScale(0.88, 0.3), Text = card.name, TextWrapped = true, ZIndex = 2 })
-		label(gui, { Position = UDim2.fromScale(0.06, 0.6), Size = UDim2.fromScale(0.88, 0.14), Text = rarity.name, TextColor3 = rarity.color, ZIndex = 2 })
-		if variantId ~= "normal" then
-			label(gui, { Position = UDim2.fromScale(0.06, 0.78), Size = UDim2.fromScale(0.88, 0.14), Text = variant.name, TextColor3 = variant.color, ZIndex = 2 })
-		end
+		local gui = surfaceGui(cardPart, face, 70)
+		CardArt.build(gui, cardId, variantId, grade)
+	end
+	if variantId == "holo" or variantId == "rainbow" then
+		local sparkles = Instance.new("Sparkles")
+		sparkles.SparkleColor = color
+		sparkles.Parent = cardPart
 	end
 
 	-- The brainrot model, if it could be loaded
-	local _, yaw = top:ToOrientation()
-	Assets.place(cardId, stand.display, (top * CFrame.new(0, 0, 0.8)).Position, yaw)
+	-- Set back by its own half depth so it never pokes through the card, and shrunk if
+	-- it's too deep or too wide for the pedestal
+	local model = Assets.get(cardId)
+	if model then
+		local size = model:GetExtentsSize()
+		local fit = math.min(1, MODEL_MAX_DEPTH / size.Z, MODEL_MAX_WIDTH / size.X)
+		if fit < 1 then
+			model:ScaleTo(model:GetScale() * fit)
+		end
+		local depth = size.Z * fit
+		local _, yaw = top:ToOrientation()
+		model:PivotTo(CFrame.new((top * CFrame.new(0, 0, -1.6 + depth / 2)).Position) * CFrame.Angles(0, yaw, 0))
+		model.Parent = stand.display
+	end
 
-	-- Floating info
+	-- Sparkles around rare cards and shiny variants
+	if Config.RARITY[card.rarity].order >= Config.RARITY.legendary.order or variantId ~= "normal" then
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		emitter.Color = ColorSequence.new(color)
+		emitter.LightEmission = 1
+		emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 0) })
+		emitter.Lifetime = NumberRange.new(1, 1.8)
+		emitter.Speed = NumberRange.new(1.5, 3)
+		emitter.SpreadAngle = Vector2.new(180, 180)
+		emitter.Rate = 4 + Config.RARITY[card.rarity].order * 2
+		emitter.Parent = cardPart
+	end
+
+	-- Floating info, like the big brainrot games: name, rarity in its color, Cash per second.
+	-- Sized in studs: it gets smaller with distance, so the 8 labels of a plot don't pile up
 	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.fromOffset(200, 60)
-	billboard.StudsOffsetWorldSpace = Vector3.new(0, 9.5, 0)
-	billboard.MaxDistance = 90
+	billboard.Size = UDim2.fromScale(9, 3.6)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, Config.MODEL_HEIGHT + 4 + stand.lift, 0)
+	billboard.MaxDistance = 60
 	billboard.LightInfluence = 0
 	billboard.Adornee = stand.base
 	billboard.Parent = stand.display
 	local prefix = if variantId == "normal" then "" else variant.name .. " "
-	label(billboard, { Size = UDim2.new(1, 0, 0.55, 0), Text = prefix .. card.name, TextColor3 = if variantId == "normal" then rarity.color else variant.color })
-	label(billboard, { Position = UDim2.fromScale(0, 0.55), Size = UDim2.new(1, 0, 0.45, 0), Text = "$" .. Format.number(Config.cardIncome(cardId, variantId)) .. "/s", TextColor3 = Color3.fromRGB(120, 255, 140) })
+	local suffix = if grade then " [" .. grade.grade .. "]" else ""
+	label(billboard, { Size = UDim2.fromScale(1, 0.36), Text = prefix .. card.name .. suffix })
+	local rarityLabel = label(billboard, { Position = UDim2.fromScale(0, 0.36), Size = UDim2.fromScale(1, 0.3), Text = string.upper(rarity.name), TextColor3 = rarity.color })
+	if card.rarity == "secret" or card.rarity == "divine" then
+		-- The top rarities get a rainbow name
+		rarityLabel.TextColor3 = Color3.new(1, 1, 1)
+		local gradient = Instance.new("UIGradient")
+		gradient.Color = CardArt.frameColors(cardId, "rainbow")
+		gradient.Parent = rarityLabel
+	end
+	label(billboard, { Position = UDim2.fromScale(0, 0.66), Size = UDim2.fromScale(1, 0.34), Text = "$" .. Format.number(Config.keyIncome(key)) .. "/s", TextColor3 = Color3.fromRGB(255, 225, 60) })
 end
 
 local function setStand(stand: Stand, key: string?)
@@ -238,6 +311,9 @@ local function setStand(stand: Stand, key: string?)
 	end
 	stand.key = key
 	stand.display:ClearAllChildren()
+	stand.ring.Color = stand.color:Lerp(Color3.new(1, 1, 1), 0.4)
+	stand.ring.Material = Enum.Material.SmoothPlastic
+	stand.light.Enabled = false
 	if key then
 		showCard(stand, key)
 	end
@@ -259,7 +335,7 @@ function Plots.assign(player: Player): boolean
 	for _, plot in plots do
 		if not plot.owner then
 			plot.owner = player
-			plot.sign.Text = player.DisplayName .. "'s Plot"
+			plot.sign.Text = player.DisplayName .. "'s Base"
 			player:SetAttribute("Plot", plot.index)
 			return true
 		end
@@ -273,7 +349,7 @@ function Plots.release(player: Player)
 		return
 	end
 	plot.owner = nil
-	plot.sign.Text = "Free plot"
+	plot.sign.Text = "Free Base"
 	plot.income.Text = ""
 	for _, stand in plot.stands do
 		setStand(stand, nil)

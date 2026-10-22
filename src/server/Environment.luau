@@ -1,11 +1,27 @@
--- Lighting and post-processing: atmosphere, bloom, colors, sun rays.
+-- The look of the world, in the bright style of the big Roblox simulators (Steal a Brainrot,
+-- Grow a Garden...): clear lighting, a cyan cartoon sky, saturated colors, a studded green
+-- baseplate, and bright terrain hills with a river around the map.
 
 local Lighting = game:GetService("Lighting")
+local MaterialService = game:GetService("MaterialService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local Environment = {}
 
-local function replace(className: string, props)
-	local old = Lighting:FindFirstChildOfClass(className)
+local MAP_SIZE = 280 -- the flat middle, where the plaza and the plots are
+-- The studded baseplate reaches the foot of the hills, so its edge hides behind them (the
+-- terrain's grass texture never quite matches plain plastic); corners stop before the river
+local BASEPLATE_SIZE = 500
+local HILLS_RADIUS = 300 -- the ring of hills around the map
+local WATER_RADIUS = 380 -- a lake ring behind the hills
+local GRASS = Color3.fromRGB(75, 200, 75)
+
+local function replace(className: string, props, parent: Instance?)
+	local target = parent or Lighting
+	local old = target:FindFirstChildOfClass(className)
 	if old then
 		old:Destroy()
 	end
@@ -13,31 +29,136 @@ local function replace(className: string, props)
 	for key, value in props do
 		(inst :: any)[key] = value
 	end
-	inst.Parent = Lighting
+	inst.Parent = target
 	return inst
 end
 
-function Environment.setup()
-	Lighting.ClockTime = 16.8
-	Lighting.Brightness = 2.2
-	Lighting.EnvironmentDiffuseScale = 0.6
-	Lighting.EnvironmentSpecularScale = 0.6
-	Lighting.OutdoorAmbient = Color3.fromRGB(120, 115, 140)
-	Lighting.Ambient = Color3.fromRGB(40, 40, 55)
+local function setupLighting()
+	Lighting.ClockTime = 13.5
+	Lighting.GeographicLatitude = 25
+	Lighting.Brightness = 2.3
+	Lighting.EnvironmentDiffuseScale = 0.4
+	Lighting.EnvironmentSpecularScale = 0.3
+	-- Bright ambient light: shadows stay soft and colors stay vivid, like a cartoon
+	Lighting.OutdoorAmbient = Color3.fromRGB(165, 165, 175)
+	Lighting.Ambient = Color3.fromRGB(110, 110, 120)
 	Lighting.GlobalShadows = true
+	Lighting.ShadowSoftness = 0.4
+	Lighting.ExposureCompensation = 0
 
-	replace("Sky", { SunAngularSize = 14, MoonAngularSize = 8, StarCount = 3000 })
-	replace("Atmosphere", {
-		Density = 0.32,
-		Offset = 0.2,
-		Color = Color3.fromRGB(200, 170, 220),
-		Decay = Color3.fromRGB(110, 80, 140),
-		Glare = 0.4,
-		Haze = 1.6,
+	local sky = Config.SKY
+	replace("Sky", {
+		SkyboxBk = sky.SkyboxBk,
+		SkyboxDn = sky.SkyboxDn,
+		SkyboxFt = sky.SkyboxFt,
+		SkyboxLf = sky.SkyboxLf,
+		SkyboxRt = sky.SkyboxRt,
+		SkyboxUp = sky.SkyboxUp,
+		SunAngularSize = 14,
+		CelestialBodiesShown = false,
 	})
-	replace("BloomEffect", { Intensity = 0.6, Size = 28, Threshold = 1.6 })
-	replace("ColorCorrectionEffect", { Saturation = 0.18, Contrast = 0.08, Brightness = 0.02 })
-	replace("SunRaysEffect", { Intensity = 0.06, Spread = 0.8 })
+	-- Very light haze, only far away: no grey veil over the map
+	replace("Atmosphere", {
+		Density = 0.22,
+		Offset = 0,
+		Color = Color3.fromRGB(200, 235, 255),
+		Decay = Color3.fromRGB(150, 200, 240),
+		Glare = 0,
+		Haze = 0,
+	})
+	replace("BloomEffect", { Intensity = 0.25, Size = 20, Threshold = 2.4 })
+	replace("ColorCorrectionEffect", { Saturation = 0.22, Contrast = 0.06, Brightness = 0.03, TintColor = Color3.new(1, 1, 1) })
+	for _, className in { "SunRaysEffect", "DepthOfFieldEffect" } do
+		local old = Lighting:FindFirstChildOfClass(className)
+		if old then
+			old:Destroy()
+		end
+	end
+	-- No texture overrides: the simulator look is plain, bright plastic
+	for _, variant in MaterialService:GetDescendants() do
+		if variant:IsA("MaterialVariant") then
+			MaterialService:SetBaseMaterialOverride(variant.BaseMaterial, "")
+		end
+	end
+end
+
+-- The flat ground in the middle: bright green plastic with studs, like a classic baseplate
+local function setupBaseplate()
+	local old = Workspace:FindFirstChild("Baseplate")
+	if old then
+		old:Destroy()
+	end
+	local baseplate = Instance.new("Part")
+	baseplate.Name = "Baseplate"
+	baseplate.Anchored = true
+	baseplate.Size = Vector3.new(BASEPLATE_SIZE, 4, BASEPLATE_SIZE)
+	baseplate.Position = Vector3.new(0, -1.9, 0) -- top at y = 0.1, just above the terrain
+	baseplate.Color = GRASS
+	baseplate.Material = Enum.Material.Plastic
+	baseplate.TopSurface = Enum.SurfaceType.Studs
+	baseplate.BottomSurface = Enum.SurfaceType.Smooth
+	baseplate.Parent = Workspace
+end
+
+local function setupTerrain()
+	local terrain = Workspace.Terrain
+	terrain:Clear()
+
+	-- Bright cartoon colors for the terrain materials
+	-- Same green as the baseplate, so its edge doesn't show
+	terrain:SetMaterialColor(Enum.Material.Grass, GRASS)
+	terrain:SetMaterialColor(Enum.Material.LeafyGrass, Color3.fromRGB(60, 180, 70))
+	terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(170, 120, 70))
+	terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(150, 150, 165))
+	terrain:SetMaterialColor(Enum.Material.Sand, Color3.fromRGB(250, 225, 150))
+	terrain.WaterColor = Color3.fromRGB(40, 170, 255)
+	terrain.WaterTransparency = 0.3
+	terrain.WaterReflectance = 0.3
+	terrain.WaterWaveSize = 0.08
+	terrain.WaterWaveSpeed = 6
+	pcall(function()
+		(terrain :: any).Decoration = false -- no grass blades: they would poke through the baseplate
+	end)
+
+	-- The ground: its surface shows up at y = 0 (terrain is drawn about 2 studs above the
+	-- block it fills, so the block stops at y = -2)
+	local size = WATER_RADIUS * 2 + 120
+	terrain:FillBlock(CFrame.new(0, -8, 0), Vector3.new(size, 12, size), Enum.Material.Grass)
+	-- Soft hills all around, two rows, with rock on the biggest ones
+	local rng = Random.new(42) -- same hills every time
+	for row = 0, 1 do
+		local count = 30 + row * 8
+		for i = 0, count - 1 do
+			local angle = (i + rng:NextNumber() * 0.6) / count * math.pi * 2
+			local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
+			local radius = rng:NextNumber(22, 42) + row * 14
+			local distance = HILLS_RADIUS + row * 30 + rng:NextNumber(-10, 10)
+			local center = direction * distance + Vector3.new(0, -radius * 0.45, 0)
+			terrain:FillBall(center, radius, if radius > 46 then Enum.Material.Rock else Enum.Material.LeafyGrass)
+			terrain:FillBall(center + Vector3.new(0, radius * 0.25, 0), radius * 0.8, Enum.Material.Grass)
+		end
+	end
+	-- A river ring behind the hills: sand banks, then the bed dug out and filled with water
+	for i = 0, 47 do
+		local angle = i / 48 * math.pi * 2
+		local position = Vector3.new(math.cos(angle), 0, math.sin(angle)) * WATER_RADIUS
+		local facing = CFrame.lookAt(position, Vector3.zero)
+		terrain:FillBlock(facing * CFrame.new(0, -1, 0), Vector3.new(58, 4, 76), Enum.Material.Sand)
+		terrain:FillBlock(facing * CFrame.new(0, 37, 0), Vector3.new(58, 90, 60), Enum.Material.Air)
+		terrain:FillBlock(facing * CFrame.new(0, -6, 0), Vector3.new(58, 8, 52), Enum.Material.Water)
+	end
+	-- Keep the middle flat (plaza and plots): clear anything above the ground there
+	terrain:FillBlock(CFrame.new(0, 30, 0), Vector3.new(MAP_SIZE, 60, MAP_SIZE), Enum.Material.Air)
+end
+
+function Environment.setup()
+	setupLighting()
+	setupTerrain()
+	setupBaseplate()
+	local clouds = Workspace.Terrain:FindFirstChildOfClass("Clouds")
+	if clouds then
+		clouds:Destroy() -- the cartoon skybox has its own clouds
+	end
 end
 
 return Environment

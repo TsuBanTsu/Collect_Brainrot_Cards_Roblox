@@ -152,9 +152,11 @@ end
 -- Ground: the plaza and the paths to the plots
 ---------------------------------------------------------------------------
 local function buildGround()
-	cylinder("Plaza", Vector3.new(0, 0.1, 0), RADIUS * 2, 1, Color3.fromRGB(235, 225, 200), Enum.Material.Pavement)
-	cylinder("PlazaRing", Vector3.new(0, 0.1, 0), RADIUS * 2 + 3, 0.9, Color3.fromRGB(180, 160, 130), Enum.Material.Cobblestone)
-	cylinder("PlazaInner", Vector3.new(0, 0.2, 0), 26, 1, Color3.fromRGB(215, 200, 170), Enum.Material.Cobblestone)
+	-- Thick parts going down into the ground, so no gap shows whatever the terrain height
+	-- Warm yellow inside the orange ring, around the blue middle
+	cylinder("Plaza", Vector3.new(0, -0.9, 0), RADIUS * 2, 3, Color3.fromRGB(255, 205, 90), Enum.Material.SmoothPlastic)
+	cylinder("PlazaRing", Vector3.new(0, -0.9, 0), RADIUS * 2 + 3, 2.8, Color3.fromRGB(255, 150, 40), Enum.Material.SmoothPlastic)
+	cylinder("PlazaInner", Vector3.new(0, 0.2, 0), 26, 1, Color3.fromRGB(80, 170, 255), Enum.Material.SmoothPlastic)
 	for i = 0, PLOT_COUNT - 1 do
 		local angle = math.rad(i * 60)
 		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
@@ -162,10 +164,11 @@ local function buildGround()
 		local center = direction * (RADIUS + length / 2 - 2)
 		part({
 			Name = "Path",
-			Size = Vector3.new(10, 1, length),
-			CFrame = CFrame.lookAt(center + Vector3.new(0, 0.05, 0), direction * 1000 + Vector3.new(0, 0.05, 0)),
-			Color = Color3.fromRGB(200, 180, 150),
-			Material = Enum.Material.Cobblestone,
+			Size = Vector3.new(10, 3, length),
+			CFrame = CFrame.lookAt(center + Vector3.new(0, -0.95, 0), direction * 1000 + Vector3.new(0, -0.95, 0)),
+			Color = Color3.fromRGB(255, 150, 40),
+			Material = Enum.Material.Plastic,
+			TopSurface = Enum.SurfaceType.Studs,
 		})
 	end
 end
@@ -196,7 +199,7 @@ local function buildStation(station: Station)
 	end
 
 	-- Counter
-	local counter = part({ Name = "Counter", Size = Vector3.new(12, 3.6, 3), CFrame = cframe * CFrame.new(0, 2, 0), Color = Color3.fromRGB(150, 105, 65), Material = Enum.Material.WoodPlanks, Parent = model })
+	local counter = part({ Name = "Counter", Size = Vector3.new(12, 3.6, 3), CFrame = cframe * CFrame.new(0, 2, 0), Color = Color3.fromRGB(250, 250, 252), Material = Enum.Material.SmoothPlastic, Parent = model })
 	part({ Name = "CounterTop", Size = Vector3.new(12.6, 0.4, 3.6), CFrame = counter.CFrame * CFrame.new(0, 2, 0), Color = station.color, Material = Enum.Material.SmoothPlastic, Parent = model })
 	if station.prop then
 		Assets.place(station.prop, model, (counter.CFrame * CFrame.new(3, 2.2, 0)).Position, yaw + math.pi)

@@ -400,7 +400,7 @@ end
 -- If a model is missing, the stand still shows the card itself.
 -- `height` in studs, `yaw` in degrees to turn the model so it faces forward.
 ---------------------------------------------------------------------------
-Config.MODEL_HEIGHT = 5
+Config.MODEL_HEIGHT = 9 -- bigger than a player, like in the big brainrot games
 -- Found on the Creator Store on 2026-10-22; no free model was found for the missing cards.
 Config.ASSETS = {
 	noobini = { id = 76207239035844 },
@@ -449,5 +449,28 @@ Config.DECOR = {
 	decor_register = { id = 3559550517, height = 2.2 },
 	decor_magnifier = { id = 11935186507, size = 3 },
 } :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
+
+---------------------------------------------------------------------------
+-- Look of the world
+---------------------------------------------------------------------------
+-- Bright cyan cartoon skybox (images from the free Creator Store model 72835926026092)
+Config.SKY = {
+	SkyboxBk = "rbxassetid://18351376859",
+	SkyboxDn = "rbxassetid://18351374919",
+	SkyboxFt = "rbxassetid://18351376800",
+	SkyboxLf = "rbxassetid://18351376469",
+	SkyboxRt = "rbxassetid://18351376457",
+	SkyboxUp = "rbxassetid://18351377189",
+}
+
+-- One bright color per plot, like the colored bases of the big simulators
+Config.PLOT_COLORS = {
+	Color3.fromRGB(235, 70, 70),
+	Color3.fromRGB(60, 150, 255),
+	Color3.fromRGB(255, 170, 40),
+	Color3.fromRGB(170, 90, 255),
+	Color3.fromRGB(50, 200, 120),
+	Color3.fromRGB(255, 100, 190),
+} :: { Color3 }
 
 return Config
