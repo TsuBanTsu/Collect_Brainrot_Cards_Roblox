@@ -153,8 +153,8 @@ end
 ---------------------------------------------------------------------------
 local function buildGround()
 	-- Thick parts going down into the ground, so no gap shows whatever the terrain height
-	-- Grass green inside the orange ring (the ring is a full disk under it), like the baseplate
-	cylinder("Plaza", Vector3.new(0, -0.9, 0), RADIUS * 2, 3, Color3.fromRGB(75, 200, 75), Enum.Material.Plastic)
+	-- Warm yellow inside the orange ring, around the blue middle
+	cylinder("Plaza", Vector3.new(0, -0.9, 0), RADIUS * 2, 3, Color3.fromRGB(255, 205, 90), Enum.Material.SmoothPlastic)
 	cylinder("PlazaRing", Vector3.new(0, -0.9, 0), RADIUS * 2 + 3, 2.8, Color3.fromRGB(255, 150, 40), Enum.Material.SmoothPlastic)
 	cylinder("PlazaInner", Vector3.new(0, 0.2, 0), 26, 1, Color3.fromRGB(80, 170, 255), Enum.Material.SmoothPlastic)
 	for i = 0, PLOT_COUNT - 1 do
