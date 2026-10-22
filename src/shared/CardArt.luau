@@ -117,11 +117,13 @@ function CardArt.build(parent: Instance, cardId: string, variantId: string, grad
 	local window = new("Frame", { Position = UDim2.fromScale(0.07, 0.12), Size = UDim2.fromScale(0.86, 0.52), BackgroundColor3 = Color3.new(1, 1, 1), ClipsDescendants = true, ZIndex = z + 2 }, inner)
 	new("UICorner", { CornerRadius = UDim.new(0.08, 0) }, window)
 	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(rarity.color:Lerp(Color3.new(1, 1, 1), 0.55), rarity.color:Lerp(DARK, 0.2)) }, window)
+	-- ViewportFrames stay blank in the stands' SurfaceGuis: there, the 3D model stands right behind
+	-- the card, so the window shows the initial. The old thumbnail is only for models that aren't loaded.
 	local model = template(cardId)
 	local image = CardArt.image(cardId)
-	if model then
+	if model and not parent:IsA("SurfaceGui") then
 		viewport(window, model, z + 3)
-	elseif image ~= "" then
+	elseif not model and image ~= "" then
 		-- Thumbnails leave a lot of empty space around the model: zoomed in (the window clips it)
 		new("ImageLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.55), Size = UDim2.fromScale(1.5, 1.5), Image = image, ScaleType = Enum.ScaleType.Fit, ZIndex = z + 3 }, window)
 	else
