@@ -33,8 +33,10 @@ local function defaultProfile()
 		Cash = Config.STARTING_CASH,
 		TotalCash = 0,
 		PacksOpened = 0,
-		Cards = {}, -- ["cardId|variantId"] = count (cards in the inventory, not on a stand)
-		Stands = {}, -- [tostring(slot)] = "cardId|variantId"
+		Cards = {}, -- ["cardId|variantId"] or ["cardId|variantId|scores"] = count (cards in the backpack, not on a stand)
+		Stands = {}, -- [tostring(slot)] = card key
+		Packs = {}, -- [packId] = unopened packs in the backpack
+		BackpackLevel = 0, -- number of backpack upgrades bought
 		Index = {}, -- [cardId] = true once pulled at least once
 		Pity = {}, -- [packId] = packs opened since the last card of Config.PITY_RARITY or better
 		LastOnline = 0, -- os.time() of the last save, for offline income
@@ -58,6 +60,11 @@ local function reconcile(data)
 		local cardId = Config.splitKey(key)
 		if not Config.CARDS[cardId] then
 			profile.Cards[key] = nil
+		end
+	end
+	for packId in profile.Packs do
+		if not Config.PACK[packId] then
+			profile.Packs[packId] = nil
 		end
 	end
 	for slot, key in profile.Stands do
@@ -183,8 +190,7 @@ end
 function PlayerData.baseIncome(profile): number
 	local total = 0
 	for _, key in profile.Stands do
-		local cardId, variantId = Config.splitKey(key)
-		total += Config.cardIncome(cardId, variantId)
+		total += Config.keyIncome(key)
 	end
 	return total * Config.indexMultiplier(PlayerData.completedPacks(profile))
 end
@@ -201,10 +207,43 @@ function PlayerData.addCash(player: Player, amount: number)
 	PlayerData.updateStats(player)
 end
 
-function PlayerData.addCard(profile, cardId: string, variantId: string)
-	local key = Config.cardKey(cardId, variantId)
+function PlayerData.addCard(profile, cardId: string, variantId: string, scores: { number }?)
+	local key = Config.cardKey(cardId, variantId, scores)
 	profile.Cards[key] = (profile.Cards[key] or 0) + 1
 	profile.Index[cardId] = true
+end
+
+---------------------------------------------------------------------------
+-- Backpack: cards and unopened packs take one slot each
+---------------------------------------------------------------------------
+function PlayerData.backpackUsed(profile): number
+	local used = 0
+	for _, count in profile.Cards do
+		used += count
+	end
+	for _, count in profile.Packs do
+		used += count
+	end
+	return used
+end
+
+function PlayerData.backpackSize(profile): number
+	return Config.backpackSize(profile.BackpackLevel)
+end
+
+-- True if `slots` more items fit in the backpack
+function PlayerData.hasRoom(profile, slots: number): boolean
+	return PlayerData.backpackUsed(profile) + slots <= PlayerData.backpackSize(profile)
+end
+
+function PlayerData.removePack(profile, packId: string, count: number): boolean
+	local owned = profile.Packs[packId] or 0
+	if owned < count then
+		return false
+	end
+	owned -= count
+	profile.Packs[packId] = if owned > 0 then owned else nil
+	return true
 end
 
 function PlayerData.removeCard(profile, key: string, count: number): boolean
@@ -251,9 +290,13 @@ function PlayerData.sync(player: Player)
 	end
 	PlayerData.updateStats(player)
 	player:SetAttribute("CompletedPacks", PlayerData.completedPacks(profile))
+	player:SetAttribute("BackpackUsed", PlayerData.backpackUsed(profile))
+	player:SetAttribute("BackpackSize", PlayerData.backpackSize(profile))
 	syncRemote:FireClient(player, {
 		cards = profile.Cards,
 		stands = profile.Stands,
+		packs = profile.Packs,
+		backpackLevel = profile.BackpackLevel,
 		index = profile.Index,
 		pity = profile.Pity,
 		dailyDay = profile.DailyDay,

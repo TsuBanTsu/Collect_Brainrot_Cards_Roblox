@@ -1,4 +1,5 @@
--- Loads the free Creator Store models listed in Config.ASSETS (the brainrot characters) when the server starts.
+-- Loads the free Creator Store models listed in Config.ASSETS (the brainrot characters) and
+-- Config.DECOR (the plaza decoration) when the server starts.
 -- Each model is cleaned up (no scripts, no collisions) and kept as a template to clone.
 -- Loading other creators' models needs "Allow Loading Third Party Assets" turned on
 -- (Game Settings > Security). If a model can't load, get() returns nil and the caller
@@ -99,12 +100,14 @@ function Assets.loadAll()
 	folder.Parent = ServerStorage
 
 	local pending = 0
-	for key, info in Config.ASSETS do
-		pending += 1
-		task.spawn(function()
-			load(key, info)
-			pending -= 1
-		end)
+	for _, list in { Config.ASSETS, Config.DECOR } do
+		for key, info in list do
+			pending += 1
+			task.spawn(function()
+				load(key, info)
+				pending -= 1
+			end)
+		end
 	end
 	local started = os.clock()
 	while pending > 0 and os.clock() - started < LOAD_TIMEOUT do
@@ -125,7 +128,8 @@ function Assets.get(key: string, height: number?): Model?
 		return nil
 	end
 	local model = template.model:Clone()
-	local wanted = height or Config.ASSETS[key].height or Config.MODEL_HEIGHT
+	local info = Config.ASSETS[key] or Config.DECOR[key]
+	local wanted = height or info.height or Config.MODEL_HEIGHT
 	model:ScaleTo(model:GetScale() * wanted / template.height)
 	return model
 end

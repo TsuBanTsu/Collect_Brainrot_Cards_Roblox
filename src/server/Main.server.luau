@@ -1,5 +1,5 @@
--- Server entry point: builds the map, then handles packs, stands, fusion,
--- income every second, weather, daily rewards and codes.
+-- Server entry point: builds the map, then handles the shop, packs, stands, fusion,
+-- selling, grading, income every second, weather, daily rewards and codes.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,7 +8,9 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Assets = require(script.Parent.Assets)
 local Environment = require(script.Parent.Environment)
+local Grading = require(script.Parent.Grading)
 local Packs = require(script.Parent.Packs)
+local Plaza = require(script.Parent.Plaza)
 local PlayerData = require(script.Parent.PlayerData)
 local Plots = require(script.Parent.Plots)
 local Weather = require(script.Parent.Weather)
@@ -18,12 +20,12 @@ local Weather = require(script.Parent.Weather)
 ---------------------------------------------------------------------------
 local remotes = Instance.new("Folder")
 remotes.Name = "Remotes"
-for _, name in { "ProfileSync", "RequestSync", "Notify", "Announce", "PlaceCard", "RemoveCard", "PlaceBest", "Fuse", "ClaimDaily" } do
+for _, name in { "ProfileSync", "RequestSync", "Notify", "Announce", "PlaceCard", "RemoveCard", "PlaceBest", "Fuse", "ClaimDaily", "BuyPack", "UpgradeBackpack", "SellCard", "SellPack" } do
 	local remote = Instance.new("RemoteEvent")
 	remote.Name = name
 	remote.Parent = remotes
 end
-for _, name in { "OpenPack", "RedeemCode" } do
+for _, name in { "OpenPack", "RedeemCode", "Grade" } do
 	local remote = Instance.new("RemoteFunction")
 	remote.Name = name
 	remote.Parent = remotes
@@ -45,6 +47,7 @@ end
 Environment.setup()
 Assets.loadAll()
 Plots.init()
+Plaza.build(Plots.folder())
 PlayerData.init(remotes)
 Weather.init(announce)
 
@@ -94,7 +97,55 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 ---------------------------------------------------------------------------
--- Packs
+-- Shop (at the plaza): packs go to the backpack, bigger backpacks
+---------------------------------------------------------------------------
+local function atStation(player: Player, stationId: string): boolean
+	if Plaza.near(player, stationId) then
+		return true
+	end
+	notify(player, "Go to the " .. stationId .. " stand in the plaza")
+	return false
+end
+
+local function validCount(count: any): boolean
+	return type(count) == "number" and count == math.floor(count) and count >= 1 and count <= 100
+end
+
+remotes.BuyPack.OnServerEvent:Connect(function(player, packId: any, count: any)
+	if type(packId) ~= "string" or not validCount(count) or not atStation(player, "shop") then
+		return
+	end
+	local ok, reason = Packs.buy(player, packId, count)
+	if ok then
+		local pack = Config.PACK[packId]
+		notify(player, (if count > 1 then count .. "x " else "") .. pack.name .. " added to your backpack")
+	else
+		notify(player, reason or "Could not buy the pack")
+	end
+end)
+
+remotes.UpgradeBackpack.OnServerEvent:Connect(function(player)
+	local profile = PlayerData.get(player)
+	if not profile or not atStation(player, "shop") then
+		return
+	end
+	local upgrade = Config.BACKPACK_UPGRADES[profile.BackpackLevel + 1]
+	if not upgrade then
+		notify(player, "Your backpack is already the biggest one")
+		return
+	end
+	if profile.Cash < upgrade.price then
+		notify(player, "Not enough Cash")
+		return
+	end
+	profile.Cash -= upgrade.price
+	profile.BackpackLevel += 1
+	notify(player, "Backpack upgraded: " .. PlayerData.backpackSize(profile) .. " slots!")
+	PlayerData.sync(player)
+end)
+
+---------------------------------------------------------------------------
+-- Opening packs from the backpack (anywhere)
 ---------------------------------------------------------------------------
 local lastOpen: { [Player]: number } = {}
 
@@ -190,6 +241,10 @@ remotes.RemoveCard.OnServerEvent:Connect(function(player, slot: any)
 		return
 	end
 	local key = profile.Stands[tostring(slot)]
+	if key and not PlayerData.hasRoom(profile, 1) then
+		notify(player, "Your backpack is full")
+		return
+	end
 	if key then
 		profile.Stands[tostring(slot)] = nil
 		profile.Cards[key] = (profile.Cards[key] or 0) + 1
@@ -210,8 +265,7 @@ remotes.PlaceBest.OnServerEvent:Connect(function(player)
 	end
 	local all = {}
 	for key, count in profile.Cards do
-		local cardId, variantId = Config.splitKey(key)
-		local income = Config.cardIncome(cardId, variantId)
+		local income = Config.keyIncome(key)
 		for _ = 1, math.min(count, Config.STAND_COUNT) do
 			table.insert(all, { key = key, income = income })
 		end
@@ -233,9 +287,13 @@ remotes.Fuse.OnServerEvent:Connect(function(player, key: any)
 	if not profile or type(key) ~= "string" then
 		return
 	end
-	local cardId, variantId = Config.splitKey(key)
+	local cardId, variantId, scores = Config.splitKey(key)
 	local nextVariant = Config.FUSE_NEXT[variantId]
 	if not Config.CARDS[cardId] or not nextVariant then
+		return
+	end
+	if scores then
+		notify(player, "Graded cards can't be fused")
 		return
 	end
 	if not PlayerData.removeCard(profile, key, Config.FUSE_COUNT) then
@@ -245,6 +303,75 @@ remotes.Fuse.OnServerEvent:Connect(function(player, key: any)
 	PlayerData.addCard(profile, cardId, nextVariant)
 	notify(player, "Fused into " .. Config.VARIANT[nextVariant].name .. " " .. Config.CARDS[cardId].name .. "!")
 	PlayerData.sync(player)
+end)
+
+---------------------------------------------------------------------------
+-- Selling (at the plaza): cards for Config.SELL_SECONDS of their Cash, packs for part of their price
+---------------------------------------------------------------------------
+remotes.SellCard.OnServerEvent:Connect(function(player, key: any, count: any)
+	local profile = PlayerData.get(player)
+	if not profile or type(key) ~= "string" or not validCount(count) or not atStation(player, "sell") then
+		return
+	end
+	count = math.min(count, profile.Cards[key] or 0)
+	if count < 1 or not PlayerData.removeCard(profile, key, count) then
+		return
+	end
+	local price = Config.sellPrice(key) * count
+	PlayerData.addCash(player, price)
+	notify(player, "Sold for $" .. Format.number(price))
+	PlayerData.sync(player)
+end)
+
+remotes.SellPack.OnServerEvent:Connect(function(player, packId: any, count: any)
+	local profile = PlayerData.get(player)
+	if not profile or type(packId) ~= "string" or not Config.PACK[packId] or not validCount(count) or not atStation(player, "sell") then
+		return
+	end
+	count = math.min(count, profile.Packs[packId] or 0)
+	if count < 1 or not PlayerData.removePack(profile, packId, count) then
+		return
+	end
+	local price = Config.packSellPrice(packId) * count
+	PlayerData.addCash(player, price)
+	notify(player, "Sold for $" .. Format.number(price))
+	PlayerData.sync(player)
+end)
+
+---------------------------------------------------------------------------
+-- Grading (at the plaza)
+---------------------------------------------------------------------------
+local lastGrade: { [Player]: number } = {}
+
+remotes.Grade.OnServerInvoke = function(player: Player, key: any)
+	if type(key) ~= "string" then
+		return nil
+	end
+	local now = os.clock()
+	if now - (lastGrade[player] or 0) < 0.5 then
+		return nil
+	end
+	lastGrade[player] = now
+	if not atStation(player, "grade") then
+		return nil
+	end
+	local result, reason = Grading.grade(player, key)
+	if not result then
+		notify(player, reason or "Could not grade the card")
+		return nil
+	end
+	if result.grade >= 9 then
+		local cardId, variantId = Config.splitKey(key)
+		local card = Config.CARDS[cardId]
+		local name = (if variantId == "normal" then "" else Config.VARIANT[variantId].name .. " ") .. card.name
+		local grade = Config.keyGrade(result.key) :: Config.Grade
+		announce(player.DisplayName .. " got a " .. grade.name .. " " .. name .. "!", grade.color)
+	end
+	return result
+end
+
+Players.PlayerRemoving:Connect(function(player)
+	lastGrade[player] = nil
 end)
 
 ---------------------------------------------------------------------------
