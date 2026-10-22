@@ -64,8 +64,8 @@ local function setupLighting()
 		Haze = 1.2,
 	})
 	-- Soft bloom: only really bright things glow, the neon and the water don't burn out
-	replace("BloomEffect", { Intensity = 0.35, Size = 22, Threshold = 2.2 })
-	replace("ColorCorrectionEffect", { Saturation = 0.15, Contrast = 0.1, Brightness = 0.02, TintColor = Color3.fromRGB(255, 250, 245) })
+	replace("BloomEffect", { Intensity = 0.3, Size = 22, Threshold = 2.6 })
+	replace("ColorCorrectionEffect", { Saturation = 0.08, Contrast = 0.1, Brightness = 0.02, TintColor = Color3.fromRGB(255, 250, 245) })
 	replace("SunRaysEffect", { Intensity = 0.04, Spread = 0.6 })
 	replace("DepthOfFieldEffect", { FarIntensity = 0.12, FocusDistance = 120, InFocusRadius = 140, NearIntensity = 0 })
 end
@@ -75,13 +75,13 @@ local function setupTerrain()
 	terrain:Clear()
 
 	-- Stylized colors for the terrain materials
-	terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(110, 190, 85))
+	terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(110, 165, 85))
 	terrain:SetMaterialColor(Enum.Material.LeafyGrass, Color3.fromRGB(90, 170, 75))
 	terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(140, 110, 80))
-	terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(130, 130, 140))
+	terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(120, 115, 105))
 	terrain:SetMaterialColor(Enum.Material.Sand, Color3.fromRGB(235, 215, 165))
-	terrain.WaterColor = Color3.fromRGB(60, 170, 220)
-	terrain.WaterTransparency = 0.6
+	terrain.WaterColor = Color3.fromRGB(45, 125, 160)
+	terrain.WaterTransparency = 0.35
 	terrain.WaterReflectance = 0.6
 	terrain.WaterWaveSize = 0.1
 	terrain.WaterWaveSpeed = 8
@@ -89,9 +89,10 @@ local function setupTerrain()
 		(terrain :: any).Decoration = true -- grass blades on the Grass material
 	end)
 
-	-- The ground: its top is at y = 0, like the old ground part
+	-- The ground: its surface shows up at y = 0 (terrain is drawn about 2 studs above the
+	-- block it fills, so the block stops at y = -2)
 	local size = WATER_RADIUS * 2 + 120
-	terrain:FillBlock(CFrame.new(0, -6, 0), Vector3.new(size, 12, size), Enum.Material.Grass)
+	terrain:FillBlock(CFrame.new(0, -8, 0), Vector3.new(size, 12, size), Enum.Material.Grass)
 	-- Soft hills all around, two rows, with rock on the biggest ones
 	local rng = Random.new(42) -- same hills every time
 	for row = 0, 1 do

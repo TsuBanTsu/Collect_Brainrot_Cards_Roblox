@@ -110,7 +110,7 @@ local function buildStand(plotModel: Model, cframe: CFrame): Stand
 	})
 	cylinder({ Name = "Pedestal", Size = Vector3.new(1.4, 6.6, 6.6), CFrame = upright(cframe * CFrame.new(0, 0.7, 0)), Color = Color3.fromRGB(235, 232, 240), Material = Enum.Material.Marble, Parent = plotModel })
 	cylinder({ Name = "Top", Size = Vector3.new(0.2, 6, 6), CFrame = upright(cframe * CFrame.new(0, 1.5, 0)), Color = Color3.fromRGB(45, 42, 60), Material = Enum.Material.Slate, Parent = plotModel })
-	local ring = cylinder({ Name = "Ring", Size = Vector3.new(0.12, 7, 7), CFrame = upright(cframe * CFrame.new(0, 1.3, 0)), Color = Color3.fromRGB(90, 90, 105), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = plotModel })
+	local ring = cylinder({ Name = "Ring", Size = Vector3.new(0.3, 7, 7), CFrame = upright(cframe * CFrame.new(0, 1.5, 0)), Color = Color3.fromRGB(90, 90, 105), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = plotModel })
 	local light = Instance.new("PointLight")
 	light.Range = 10
 	light.Brightness = 1.2
@@ -158,7 +158,7 @@ local function buildPlot(index: number): Plot
 	model.Parent = mapFolder
 
 	-- Tiled floor on a stone curb
-	part({ Name = "Curb", Size = Vector3.new(PLOT_WIDTH + 2, 0.5, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(0, 0.25, 0), Color = Color3.fromRGB(165, 160, 155), Material = Enum.Material.Cobblestone, Parent = model })
+	part({ Name = "Curb", Size = Vector3.new(PLOT_WIDTH + 2, 2.5, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(0, -0.75, 0), Color = Color3.fromRGB(165, 160, 155), Material = Enum.Material.Cobblestone, Parent = model })
 	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = Color3.fromRGB(235, 225, 205), Material = Enum.Material.Pavement, Parent = model })
 
 	-- Fence on the sides and at the back; the front, facing the plaza, stays open
@@ -269,7 +269,7 @@ local function showCard(stand: Stand, key: string)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.fromOffset(200, 60)
 	billboard.StudsOffsetWorldSpace = Vector3.new(0, 9.5, 0)
-	billboard.MaxDistance = 90
+	billboard.MaxDistance = 35
 	billboard.LightInfluence = 0
 	billboard.Adornee = stand.base
 	billboard.Parent = stand.display
