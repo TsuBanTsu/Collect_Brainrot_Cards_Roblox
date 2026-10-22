@@ -66,6 +66,10 @@ local function fetch(key: string, info): Model?
 	if saved and saved:IsA("Model") then
 		return saved:Clone()
 	end
+	if info.id == 0 then
+		warn(string.format("[Assets] '%s' is missing from ServerStorage.AssetLibrary: run tools/import-from-pack.lua", key))
+		return nil
+	end
 	local ok, result = pcall(AssetService.LoadAssetAsync, AssetService, info.id)
 	if not ok or not result then
 		warn(string.format("[Assets] Could not load '%s' (%d): %s", key, info.id, tostring(result)))
@@ -85,7 +89,9 @@ local function load(key: string, info)
 		model:Destroy()
 		return
 	end
-	-- Pivot at the bottom center of the model, facing -Z (turned by `yaw` if needed)
+	-- Pivot at the bottom center of the model, facing -Z (turned by `yaw` if needed).
+	-- WorldPivot is ignored while a PrimaryPart is set (the pack's ones are tipped over by 90°)
+	model.PrimaryPart = nil
 	model.WorldPivot = CFrame.new(model:GetPivot().Position) * CFrame.Angles(0, math.rad(info.yaw or 0), 0)
 	local box, size = model:GetBoundingBox()
 	model.WorldPivot = CFrame.new(box.Position - Vector3.new(0, size.Y / 2, 0)) * model.WorldPivot.Rotation
@@ -97,7 +103,8 @@ end
 function Assets.loadAll()
 	folder = Instance.new("Folder")
 	folder.Name = "AssetTemplates"
-	folder.Parent = ServerStorage
+	-- Replicated so that the cards can show the 3D model (CardArt.luau); the models carry no scripts
+	folder.Parent = ReplicatedStorage
 
 	local pending = 0
 	for _, list in { Config.ASSETS, Config.DECOR } do
