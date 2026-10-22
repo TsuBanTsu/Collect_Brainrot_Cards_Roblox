@@ -15,7 +15,7 @@ local Assets = {}
 
 local LOAD_TIMEOUT = 20 -- seconds to wait for all the models before building the map
 
-type Template = { model: Model, height: number }
+type Template = { model: Model, height: number, longest: number }
 local templates: { [string]: Template } = {}
 local folder: Folder
 
@@ -91,7 +91,7 @@ local function load(key: string, info)
 	model.WorldPivot = CFrame.new(box.Position - Vector3.new(0, size.Y / 2, 0)) * model.WorldPivot.Rotation
 	model.Name = key
 	model.Parent = folder
-	templates[key] = { model = model, height = size.Y }
+	templates[key] = { model = model, height = size.Y, longest = math.max(size.X, size.Y, size.Z) }
 end
 
 function Assets.loadAll()
@@ -129,6 +129,11 @@ function Assets.get(key: string, height: number?): Model?
 	end
 	local model = template.model:Clone()
 	local info = Config.ASSETS[key] or Config.DECOR[key]
+	if not height and info.size then
+		-- Flat models: scaled by their longest side instead of their height
+		model:ScaleTo(model:GetScale() * info.size / template.longest)
+		return model
+	end
 	local wanted = height or info.height or Config.MODEL_HEIGHT
 	model:ScaleTo(model:GetScale() * wanted / template.height)
 	return model

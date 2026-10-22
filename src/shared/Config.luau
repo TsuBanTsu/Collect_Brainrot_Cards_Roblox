@@ -433,10 +433,11 @@ Config.ASSETS = {
 	strawberry = { id = 14964355116 },
 	trictrac = { id = 97300319440209 },
 	blueberrinni = { id = 93308616326000 },
-} :: { [string]: { id: number, height: number?, yaw: number? } }
+} :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
 
 -- Free Creator Store models that decorate the plaza (same loading as the brainrots).
 -- If one is missing, a simple shape built from parts takes its place.
+-- `size` (instead of `height`) scales a flat model by its longest side.
 Config.DECOR = {
 	decor_fountain = { id = 11423259371, height = 9 },
 	decor_stall = { id = 15147571772, height = 11 },
@@ -446,7 +447,7 @@ Config.DECOR = {
 	decor_bench = { id = 23153972, height = 3.5 },
 	decor_flowers = { id = 8344171779, height = 3 },
 	decor_register = { id = 3559550517, height = 2.2 },
-	decor_magnifier = { id = 11935186507, height = 1.2 },
-} :: { [string]: { id: number, height: number?, yaw: number? } }
+	decor_magnifier = { id = 11935186507, size = 3 },
+} :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
 
 return Config

@@ -102,7 +102,9 @@ local function buildTree(position: Vector3, sakura: boolean)
 end
 
 local function buildLamp(position: Vector3)
-	if decor("decor_lamp", position) then
+	-- Turned toward the middle so all the lamps look the same way from the plaza
+	local _, yaw = CFrame.lookAt(position, Vector3.new(0, position.Y, 0)):ToOrientation()
+	if decor("decor_lamp", position, yaw) then
 		return
 	end
 	part({ Name = "LampPole", Size = Vector3.new(0.8, 12, 0.8), Position = position + Vector3.new(0, 6, 0), Color = Color3.fromRGB(50, 50, 60), Material = Enum.Material.Metal })
