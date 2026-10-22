@@ -11,7 +11,10 @@ local Config = require(ReplicatedStorage.Shared.Config)
 
 local Environment = {}
 
-local MAP_SIZE = 280 -- the studded baseplate in the middle, where the plaza and the plots are
+local MAP_SIZE = 280 -- the flat middle, where the plaza and the plots are
+-- The studded baseplate reaches the foot of the hills, so its edge hides behind them (the
+-- terrain's grass texture never quite matches plain plastic); corners stop before the river
+local BASEPLATE_SIZE = 500
 local HILLS_RADIUS = 300 -- the ring of hills around the map
 local WATER_RADIUS = 380 -- a lake ring behind the hills
 local GRASS = Color3.fromRGB(75, 200, 75)
@@ -88,7 +91,7 @@ local function setupBaseplate()
 	local baseplate = Instance.new("Part")
 	baseplate.Name = "Baseplate"
 	baseplate.Anchored = true
-	baseplate.Size = Vector3.new(MAP_SIZE, 4, MAP_SIZE)
+	baseplate.Size = Vector3.new(BASEPLATE_SIZE, 4, BASEPLATE_SIZE)
 	baseplate.Position = Vector3.new(0, -1.9, 0) -- top at y = 0.1, just above the terrain
 	baseplate.Color = GRASS
 	baseplate.Material = Enum.Material.Plastic

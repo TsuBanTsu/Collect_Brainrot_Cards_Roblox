@@ -17,9 +17,10 @@ local PLOT_RADIUS = 78 -- distance from the middle of the map
 local PLOT_WIDTH = 46
 local PLOT_DEPTH = 38
 local MODEL_MAX_DEPTH = 7 -- deeper brainrot models are shrunk to fit behind the card
+local MODEL_MAX_WIDTH = 8 -- and wider ones so they don't reach the next stand (10 studs apart)
 local FONT = Enum.Font.FredokaOne
 
-type Stand = { base: BasePart, ring: BasePart, light: PointLight, display: Model, key: string?, color: Color3 }
+type Stand = { base: BasePart, ring: BasePart, light: PointLight, display: Model, key: string?, color: Color3, lift: number }
 type Plot = { index: number, cframe: CFrame, model: Model, owner: Player?, stands: { Stand }, sign: TextLabel, income: TextLabel }
 
 local plots: { Plot } = {}
@@ -90,7 +91,7 @@ local function buildCenter()
 end
 
 -- A square podium in the plot's color, with a strip that glows with the card's rarity
-local function buildStand(plotModel: Model, cframe: CFrame, color: Color3): Stand
+local function buildStand(plotModel: Model, cframe: CFrame, color: Color3, lift: number): Stand
 	-- Invisible block: the stand's position for the card, the model and the floating info
 	local base = part({
 		Name = "Stand",
@@ -111,7 +112,7 @@ local function buildStand(plotModel: Model, cframe: CFrame, color: Color3): Stan
 	local display = Instance.new("Model")
 	display.Name = "Display"
 	display.Parent = plotModel
-	return { base = base, ring = ring, light = light, display = display, key = nil, color = color }
+	return { base = base, ring = ring, light = light, display = display, key = nil, color = color, lift = lift }
 end
 
 local function buildPlot(index: number): Plot
@@ -191,7 +192,8 @@ local function buildPlot(index: number): Plot
 		local column = (slot - 1) % perRow
 		local x = (column - (perRow - 1) / 2) * 10
 		local z = -6 + row * 13
-		stands[slot] = buildStand(model, cframe * CFrame.new(x, 0.6, z), color)
+		-- The back row's labels float a bit higher, so they don't sit behind the front row's
+		stands[slot] = buildStand(model, cframe * CFrame.new(x, 0.6, z), color, row * 2)
 	end
 
 	return { index = index, cframe = cframe, model = model, owner = nil, stands = stands, sign = sign, income = income }
@@ -252,14 +254,15 @@ local function showCard(stand: Stand, key: string)
 
 	-- The brainrot model, if it could be loaded
 	-- Set back by its own half depth so it never pokes through the card, and shrunk if
-	-- it's too deep for the pedestal
+	-- it's too deep or too wide for the pedestal
 	local model = Assets.get(cardId)
 	if model then
-		local depth = model:GetExtentsSize().Z
-		if depth > MODEL_MAX_DEPTH then
-			model:ScaleTo(model:GetScale() * MODEL_MAX_DEPTH / depth)
-			depth = MODEL_MAX_DEPTH
+		local size = model:GetExtentsSize()
+		local fit = math.min(1, MODEL_MAX_DEPTH / size.Z, MODEL_MAX_WIDTH / size.X)
+		if fit < 1 then
+			model:ScaleTo(model:GetScale() * fit)
 		end
+		local depth = size.Z * fit
 		local _, yaw = top:ToOrientation()
 		model:PivotTo(CFrame.new((top * CFrame.new(0, 0, -1.6 + depth / 2)).Position) * CFrame.Angles(0, yaw, 0))
 		model.Parent = stand.display
@@ -283,7 +286,7 @@ local function showCard(stand: Stand, key: string)
 	-- Sized in studs: it gets smaller with distance, so the 8 labels of a plot don't pile up
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.fromScale(9, 3.6)
-	billboard.StudsOffsetWorldSpace = Vector3.new(0, Config.MODEL_HEIGHT + 4, 0)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, Config.MODEL_HEIGHT + 4 + stand.lift, 0)
 	billboard.MaxDistance = 60
 	billboard.LightInfluence = 0
 	billboard.Adornee = stand.base
