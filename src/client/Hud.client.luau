@@ -74,7 +74,7 @@ local function button(props, onClick: () -> ())
 	-- The text lives in a child label: a UIGradient tints its own object's text, never its children
 	local b = create("TextButton", props, {
 		corner(10),
-		stroke(2.5),
+		stroke(3.5),
 		gradient(color:Lerp(Color3.new(1, 1, 1), 0.15), color:Lerp(Color3.new(0, 0, 0), 0.25)),
 		textLabel({
 			Name = "Label",
@@ -241,6 +241,34 @@ for _, attr in { "Cash", "Income", "BackpackUsed", "BackpackSize" } do
 	player:GetAttributeChangedSignal(attr):Connect(refreshStats)
 end
 refreshStats()
+
+-- "+$123" floating up from the Cash counter when money comes in
+local lastCash = player:GetAttribute("Cash") or 0
+player:GetAttributeChangedSignal("Cash"):Connect(function()
+	local cash = player:GetAttribute("Cash") or 0
+	local gained = cash - lastCash
+	lastCash = cash
+	if gained <= 0 then
+		return
+	end
+	local popup = textLabel({
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, math.random(-60, 60), 0, 110),
+		Size = UDim2.fromOffset(200, 30),
+		Text = "+$" .. Format.number(gained),
+		TextColor3 = CASH_COLOR,
+		ZIndex = 5,
+		Parent = root,
+	})
+	TweenService:Create(popup, TweenInfo.new(1, Enum.EasingStyle.Quad), { Position = popup.Position - UDim2.fromOffset(0, 60), TextTransparency = 1 }):Play()
+	local outline = popup:FindFirstChildOfClass("UIStroke")
+	if outline then
+		TweenService:Create(outline, TweenInfo.new(1), { Transparency = 1 }):Play()
+	end
+	task.delay(1, function()
+		popup:Destroy()
+	end)
+end)
 
 local weatherLabel = textLabel({
 	AnchorPoint = Vector2.new(0.5, 0),
@@ -535,6 +563,21 @@ local function showPull(slot: Frame, pull)
 	if pull.oneIn >= 100 then
 		local pop = create("UIScale", { Scale = 1.6, Parent = chance })
 		TweenService:Create(pop, TweenInfo.new(0.5, Enum.EasingStyle.Elastic), { Scale = 1 }):Play()
+	end
+	-- Very rare pulls: the screen flashes in the card's color and the card shakes
+	if pull.oneIn >= 1000 then
+		local flash = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = nameColor(pull.card, pull.variant), BackgroundTransparency = 0.2, ZIndex = 30, Parent = root })
+		TweenService:Create(flash, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
+		task.delay(0.6, function()
+			flash:Destroy()
+		end)
+		task.spawn(function()
+			for i = 1, 8 do
+				holder.Rotation = if i % 2 == 0 then 4 else -4
+				task.wait(0.04)
+			end
+			holder.Rotation = 0
+		end)
 	end
 end
 

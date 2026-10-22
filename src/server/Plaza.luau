@@ -153,9 +153,9 @@ end
 ---------------------------------------------------------------------------
 local function buildGround()
 	-- Thick parts going down into the ground, so no gap shows whatever the terrain height
-	cylinder("Plaza", Vector3.new(0, -0.9, 0), RADIUS * 2, 3, Color3.fromRGB(225, 210, 185), Enum.Material.Cobblestone)
-	cylinder("PlazaRing", Vector3.new(0, -0.9, 0), RADIUS * 2 + 3, 2.8, Color3.fromRGB(175, 135, 110), Enum.Material.Brick)
-	cylinder("PlazaInner", Vector3.new(0, 0.2, 0), 26, 1, Color3.fromRGB(215, 200, 170), Enum.Material.Cobblestone)
+	cylinder("Plaza", Vector3.new(0, -0.9, 0), RADIUS * 2, 3, Color3.fromRGB(225, 230, 240), Enum.Material.SmoothPlastic)
+	cylinder("PlazaRing", Vector3.new(0, -0.9, 0), RADIUS * 2 + 3, 2.8, Color3.fromRGB(255, 150, 40), Enum.Material.SmoothPlastic)
+	cylinder("PlazaInner", Vector3.new(0, 0.2, 0), 26, 1, Color3.fromRGB(80, 170, 255), Enum.Material.SmoothPlastic)
 	for i = 0, PLOT_COUNT - 1 do
 		local angle = math.rad(i * 60)
 		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
@@ -165,8 +165,9 @@ local function buildGround()
 			Name = "Path",
 			Size = Vector3.new(10, 3, length),
 			CFrame = CFrame.lookAt(center + Vector3.new(0, -0.95, 0), direction * 1000 + Vector3.new(0, -0.95, 0)),
-			Color = Color3.fromRGB(200, 180, 150),
-			Material = Enum.Material.Cobblestone,
+			Color = Color3.fromRGB(255, 150, 40),
+			Material = Enum.Material.Plastic,
+			TopSurface = Enum.SurfaceType.Studs,
 		})
 	end
 end
@@ -197,7 +198,7 @@ local function buildStation(station: Station)
 	end
 
 	-- Counter
-	local counter = part({ Name = "Counter", Size = Vector3.new(12, 3.6, 3), CFrame = cframe * CFrame.new(0, 2, 0), Color = Color3.fromRGB(150, 105, 65), Material = Enum.Material.WoodPlanks, Parent = model })
+	local counter = part({ Name = "Counter", Size = Vector3.new(12, 3.6, 3), CFrame = cframe * CFrame.new(0, 2, 0), Color = Color3.fromRGB(250, 250, 252), Material = Enum.Material.SmoothPlastic, Parent = model })
 	part({ Name = "CounterTop", Size = Vector3.new(12.6, 0.4, 3.6), CFrame = counter.CFrame * CFrame.new(0, 2, 0), Color = station.color, Material = Enum.Material.SmoothPlastic, Parent = model })
 	if station.prop then
 		Assets.place(station.prop, model, (counter.CFrame * CFrame.new(3, 2.2, 0)).Position, yaw + math.pi)

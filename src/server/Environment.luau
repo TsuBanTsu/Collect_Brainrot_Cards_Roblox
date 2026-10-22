@@ -1,8 +1,7 @@
--- Lighting, sky, clouds, hand-painted textures and the terrain around the map: soft hills,
--- a lake ring and stylized colors. Lighting.Technology can't be set by a script: choose it
--- in Studio (Lighting > Technology > Future) and save the place.
+-- The look of the world, in the bright style of the big Roblox simulators (Steal a Brainrot,
+-- Grow a Garden...): clear lighting, a cyan cartoon sky, saturated colors, a studded green
+-- baseplate, and bright terrain hills with a river around the map.
 
-local AssetService = game:GetService("AssetService")
 local Lighting = game:GetService("Lighting")
 local MaterialService = game:GetService("MaterialService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,7 +11,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 
 local Environment = {}
 
-local MAP_SIZE = 560 -- flat grass in the middle, where the plaza and the plots are
+local MAP_SIZE = 280 -- the studded baseplate in the middle, where the plaza and the plots are
 local HILLS_RADIUS = 300 -- the ring of hills around the map
 local WATER_RADIUS = 380 -- a lake ring behind the hills
 
@@ -31,16 +30,17 @@ local function replace(className: string, props, parent: Instance?)
 end
 
 local function setupLighting()
-	Lighting.ClockTime = 14.6
-	Lighting.GeographicLatitude = 30
-	Lighting.Brightness = 3
-	Lighting.EnvironmentDiffuseScale = 1
-	Lighting.EnvironmentSpecularScale = 1
-	Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 160)
-	Lighting.Ambient = Color3.fromRGB(60, 60, 75)
+	Lighting.ClockTime = 13.5
+	Lighting.GeographicLatitude = 25
+	Lighting.Brightness = 2.6
+	Lighting.EnvironmentDiffuseScale = 0.4
+	Lighting.EnvironmentSpecularScale = 0.3
+	-- Bright ambient light: shadows stay soft and colors stay vivid, like a cartoon
+	Lighting.OutdoorAmbient = Color3.fromRGB(165, 165, 175)
+	Lighting.Ambient = Color3.fromRGB(110, 110, 120)
 	Lighting.GlobalShadows = true
-	Lighting.ShadowSoftness = 0.25
-	Lighting.ExposureCompensation = 0.1
+	Lighting.ShadowSoftness = 0.4
+	Lighting.ExposureCompensation = 0.15
 
 	local sky = Config.SKY
 	replace("Sky", {
@@ -50,43 +50,69 @@ local function setupLighting()
 		SkyboxLf = sky.SkyboxLf,
 		SkyboxRt = sky.SkyboxRt,
 		SkyboxUp = sky.SkyboxUp,
-		SunAngularSize = 11,
-		MoonAngularSize = 8,
-		StarCount = 3000,
-		CelestialBodiesShown = true,
+		SunAngularSize = 14,
+		CelestialBodiesShown = false,
 	})
+	-- Very light haze, only far away: no grey veil over the map
 	replace("Atmosphere", {
-		Density = 0.28,
-		Offset = 0.1,
-		Color = Color3.fromRGB(205, 225, 255),
-		Decay = Color3.fromRGB(120, 140, 190),
-		Glare = 0.2,
-		Haze = 1.2,
+		Density = 0.22,
+		Offset = 0,
+		Color = Color3.fromRGB(200, 235, 255),
+		Decay = Color3.fromRGB(150, 200, 240),
+		Glare = 0,
+		Haze = 0,
 	})
-	-- Soft bloom: only really bright things glow, the neon and the water don't burn out
-	replace("BloomEffect", { Intensity = 0.3, Size = 22, Threshold = 2.6 })
-	replace("ColorCorrectionEffect", { Saturation = 0.08, Contrast = 0.1, Brightness = 0.02, TintColor = Color3.fromRGB(255, 250, 245) })
-	replace("SunRaysEffect", { Intensity = 0.04, Spread = 0.6 })
-	replace("DepthOfFieldEffect", { FarIntensity = 0.12, FocusDistance = 120, InFocusRadius = 140, NearIntensity = 0 })
+	replace("BloomEffect", { Intensity = 0.25, Size = 20, Threshold = 2.4 })
+	replace("ColorCorrectionEffect", { Saturation = 0.22, Contrast = 0.06, Brightness = 0.03, TintColor = Color3.new(1, 1, 1) })
+	for _, className in { "SunRaysEffect", "DepthOfFieldEffect" } do
+		local old = Lighting:FindFirstChildOfClass(className)
+		if old then
+			old:Destroy()
+		end
+	end
+	-- No texture overrides: the simulator look is plain, bright plastic
+	for _, variant in MaterialService:GetDescendants() do
+		if variant:IsA("MaterialVariant") then
+			MaterialService:SetBaseMaterialOverride(variant.BaseMaterial, "")
+		end
+	end
+end
+
+-- The flat ground in the middle: bright green plastic with studs, like a classic baseplate
+local function setupBaseplate()
+	local old = Workspace:FindFirstChild("Baseplate")
+	if old then
+		old:Destroy()
+	end
+	local baseplate = Instance.new("Part")
+	baseplate.Name = "Baseplate"
+	baseplate.Anchored = true
+	baseplate.Size = Vector3.new(MAP_SIZE, 4, MAP_SIZE)
+	baseplate.Position = Vector3.new(0, -1.9, 0) -- top at y = 0.1, just above the terrain
+	baseplate.Color = Color3.fromRGB(75, 200, 75)
+	baseplate.Material = Enum.Material.Plastic
+	baseplate.TopSurface = Enum.SurfaceType.Studs
+	baseplate.BottomSurface = Enum.SurfaceType.Smooth
+	baseplate.Parent = Workspace
 end
 
 local function setupTerrain()
 	local terrain = Workspace.Terrain
 	terrain:Clear()
 
-	-- Stylized colors for the terrain materials
-	terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(110, 165, 85))
-	terrain:SetMaterialColor(Enum.Material.LeafyGrass, Color3.fromRGB(90, 170, 75))
-	terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(140, 110, 80))
-	terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(120, 115, 105))
-	terrain:SetMaterialColor(Enum.Material.Sand, Color3.fromRGB(235, 215, 165))
-	terrain.WaterColor = Color3.fromRGB(45, 125, 160)
-	terrain.WaterTransparency = 0.35
-	terrain.WaterReflectance = 0.6
-	terrain.WaterWaveSize = 0.1
-	terrain.WaterWaveSpeed = 8
+	-- Bright cartoon colors for the terrain materials
+	terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(80, 200, 80))
+	terrain:SetMaterialColor(Enum.Material.LeafyGrass, Color3.fromRGB(60, 180, 70))
+	terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(170, 120, 70))
+	terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(150, 150, 165))
+	terrain:SetMaterialColor(Enum.Material.Sand, Color3.fromRGB(250, 225, 150))
+	terrain.WaterColor = Color3.fromRGB(40, 170, 255)
+	terrain.WaterTransparency = 0.3
+	terrain.WaterReflectance = 0.3
+	terrain.WaterWaveSize = 0.08
+	terrain.WaterWaveSpeed = 6
 	pcall(function()
-		(terrain :: any).Decoration = true -- grass blades on the Grass material
+		(terrain :: any).Decoration = false -- no grass blades: they would poke through the baseplate
 	end)
 
 	-- The ground: its surface shows up at y = 0 (terrain is drawn about 2 studs above the
@@ -123,51 +149,17 @@ local function setupTerrain()
 		terrain:FillBall(direction * rng:NextNumber(150, 230) + Vector3.new(0, -9, 0), rng:NextNumber(12, 18), Enum.Material.Grass)
 	end
 	-- Keep the middle flat (plaza and plots): clear anything above the ground there
-	terrain:FillBlock(CFrame.new(0, 30, 0), Vector3.new(MAP_SIZE * 0.5, 60, MAP_SIZE * 0.5), Enum.Material.Air)
-end
-
-local function setupClouds()
-	local clouds = Workspace.Terrain:FindFirstChildOfClass("Clouds") or Instance.new("Clouds")
-	clouds.Cover = 0.55
-	clouds.Density = 0.6
-	clouds.Color = Color3.fromRGB(255, 255, 255)
-	clouds.Parent = Workspace.Terrain
-end
-
--- The textures are saved in the place by tools/import-assets.lua (MaterialService);
--- otherwise they are loaded from the Creator Store (works once the place is published)
-local function setupMaterials()
-	if not MaterialService:FindFirstChildWhichIsA("MaterialVariant", true) then
-		local ok, pack = pcall(AssetService.LoadAssetAsync, AssetService, Config.MATERIAL_PACK)
-		if ok and pack then
-			for _, variant in pack:GetDescendants() do
-				if variant:IsA("MaterialVariant") then
-					variant.Parent = MaterialService
-				end
-			end
-			pack:Destroy()
-		else
-			warn("[Environment] Could not load the texture pack:", pack)
-		end
-	end
-	local applied = 0
-	for materialName, info in Config.MATERIAL_OVERRIDES do
-		local material = (Enum.Material :: any)[materialName] :: Enum.Material
-		local variant = MaterialService:FindFirstChild(info.variant, true)
-		if variant and variant:IsA("MaterialVariant") and variant.BaseMaterial == material then
-			variant.StudsPerTile = info.tile
-			MaterialService:SetBaseMaterialOverride(material, info.variant)
-			applied += 1
-		end
-	end
-	print(string.format("[Environment] %d textures applied", applied))
+	terrain:FillBlock(CFrame.new(0, 30, 0), Vector3.new(MAP_SIZE, 60, MAP_SIZE), Enum.Material.Air)
 end
 
 function Environment.setup()
-	setupMaterials()
 	setupLighting()
 	setupTerrain()
-	setupClouds()
+	setupBaseplate()
+	local clouds = Workspace.Terrain:FindFirstChildOfClass("Clouds")
+	if clouds then
+		clouds:Destroy() -- the cartoon skybox has its own clouds
+	end
 end
 
 return Environment

@@ -18,7 +18,7 @@ local PLOT_WIDTH = 46
 local PLOT_DEPTH = 38
 local FONT = Enum.Font.FredokaOne
 
-type Stand = { base: BasePart, ring: BasePart, light: PointLight, display: Model, key: string? }
+type Stand = { base: BasePart, ring: BasePart, light: PointLight, display: Model, key: string?, color: Color3 }
 type Plot = { index: number, cframe: CFrame, model: Model, owner: Player?, stands: { Stand }, sign: TextLabel, income: TextLabel }
 
 local plots: { Plot } = {}
@@ -48,7 +48,7 @@ local function label(parent: Instance, props): TextLabel
 		(l :: any)[key] = value
 	end
 	local outline = Instance.new("UIStroke")
-	outline.Thickness = 2
+	outline.Thickness = 3
 	outline.Parent = l
 	l.Parent = parent
 	return l
@@ -88,18 +88,8 @@ local function buildCenter()
 	label(billboard, { Size = UDim2.fromScale(1, 1), Text = "COLLECT BRAINROT CARDS", TextColor3 = Color3.fromRGB(255, 220, 90) })
 end
 
-local function cylinder(props): Part
-	props.Shape = Enum.PartType.Cylinder
-	return part(props)
-end
-
--- A cylinder standing up: `cframe` is its center, `height` along Y
-local function upright(cframe: CFrame): CFrame
-	return cframe * CFrame.Angles(0, 0, math.rad(90))
-end
-
--- A round display pedestal: marble base, dark top and a ring that glows with the card's rarity
-local function buildStand(plotModel: Model, cframe: CFrame): Stand
+-- A square podium in the plot's color, with a strip that glows with the card's rarity
+local function buildStand(plotModel: Model, cframe: CFrame, color: Color3): Stand
 	-- Invisible block: the stand's position for the card, the model and the floating info
 	local base = part({
 		Name = "Stand",
@@ -108,43 +98,19 @@ local function buildStand(plotModel: Model, cframe: CFrame): Stand
 		Transparency = 1,
 		Parent = plotModel,
 	})
-	cylinder({ Name = "Pedestal", Size = Vector3.new(1.4, 6.6, 6.6), CFrame = upright(cframe * CFrame.new(0, 0.7, 0)), Color = Color3.fromRGB(235, 232, 240), Material = Enum.Material.Marble, Parent = plotModel })
-	cylinder({ Name = "Top", Size = Vector3.new(0.2, 6, 6), CFrame = upright(cframe * CFrame.new(0, 1.5, 0)), Color = Color3.fromRGB(45, 42, 60), Material = Enum.Material.Slate, Parent = plotModel })
-	local ring = cylinder({ Name = "Ring", Size = Vector3.new(0.2, 7, 7), CFrame = upright(cframe * CFrame.new(0, 1.45, 0)), Color = Color3.fromRGB(90, 90, 105), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = plotModel })
+	part({ Name = "Podium", Size = Vector3.new(7, 1.3, 6), CFrame = cframe * CFrame.new(0, 0.65, 0), Color = color:Lerp(Color3.new(0, 0, 0), 0.3), Material = Enum.Material.SmoothPlastic, Parent = plotModel })
+	part({ Name = "Top", Size = Vector3.new(6.4, 0.3, 5.4), CFrame = cframe * CFrame.new(0, 1.45, 0), Color = Color3.fromRGB(245, 245, 250), Material = Enum.Material.SmoothPlastic, Parent = plotModel })
+	local ring = part({ Name = "Ring", Size = Vector3.new(7.3, 0.25, 6.3), CFrame = cframe * CFrame.new(0, 1.3, 0), Color = color:Lerp(Color3.new(1, 1, 1), 0.4), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = plotModel })
 	local light = Instance.new("PointLight")
 	light.Range = 10
-	light.Brightness = 1.2
+	light.Brightness = 1.5
 	light.Shadows = false
 	light.Enabled = false
 	light.Parent = ring
 	local display = Instance.new("Model")
 	display.Name = "Display"
 	display.Parent = plotModel
-	return { base = base, ring = ring, light = light, display = display, key = nil }
-end
-
-local WOOD = Color3.fromRGB(140, 100, 65)
-
--- Wooden fence along a line, from `from` to `to` (plot space)
-local function buildFence(model: Model, cframe: CFrame, from: Vector3, to: Vector3)
-	local length = (to - from).Magnitude
-	local posts = math.max(1, math.floor(length / 6))
-	local direction = (to - from).Unit
-	for i = 0, posts do
-		local position = from + direction * (length * i / posts)
-		part({ Name = "FencePost", Size = Vector3.new(0.8, 3.2, 0.8), CFrame = cframe * CFrame.new(position + Vector3.new(0, 1.6, 0)), Color = WOOD, Material = Enum.Material.Wood, Parent = model })
-	end
-	local middle = (from + to) / 2
-	for _, height in { 1.3, 2.5 } do
-		part({
-			Name = "FenceRail",
-			Size = Vector3.new(0.35, 0.45, length),
-			CFrame = cframe * CFrame.lookAt(middle + Vector3.new(0, height, 0), to + Vector3.new(0, height, 0)),
-			Color = WOOD:Lerp(Color3.new(1, 1, 1), 0.1),
-			Material = Enum.Material.WoodPlanks,
-			Parent = model,
-		})
-	end
+	return { base = base, ring = ring, light = light, display = display, key = nil, color = color }
 end
 
 local function buildPlot(index: number): Plot
@@ -152,20 +118,29 @@ local function buildPlot(index: number): Plot
 	local position = Vector3.new(math.cos(angle) * PLOT_RADIUS, 0, math.sin(angle) * PLOT_RADIUS)
 	-- -Z of the plot faces the middle of the map
 	local cframe = CFrame.lookAt(position, Vector3.zero)
+	local color = Config.PLOT_COLORS[(index - 1) % #Config.PLOT_COLORS + 1]
+	local white = Color3.fromRGB(248, 248, 252)
 
 	local model = Instance.new("Model")
 	model.Name = "Plot" .. index
 	model.Parent = mapFolder
 
-	-- Tiled floor on a stone curb
-	part({ Name = "Curb", Size = Vector3.new(PLOT_WIDTH + 2, 2.5, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(0, -0.75, 0), Color = Color3.fromRGB(165, 160, 155), Material = Enum.Material.Cobblestone, Parent = model })
-	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = Color3.fromRGB(190, 160, 125), Material = Enum.Material.WoodPlanks, Parent = model })
+	-- Studded floor in a light shade of the plot's color, on a base in the plot's color
+	part({ Name = "Curb", Size = Vector3.new(PLOT_WIDTH + 2, 2.5, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(0, -0.75, 0), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
+	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = color:Lerp(white, 0.6), Material = Enum.Material.Plastic, TopSurface = Enum.SurfaceType.Studs, Parent = model })
 
-	-- Fence on the sides and at the back; the front, facing the plaza, stays open
-	local halfW, halfD = PLOT_WIDTH / 2 + 0.5, PLOT_DEPTH / 2 + 0.5
-	buildFence(model, cframe, Vector3.new(-halfW, 0.5, -halfD), Vector3.new(-halfW, 0.5, halfD))
-	buildFence(model, cframe, Vector3.new(halfW, 0.5, -halfD), Vector3.new(halfW, 0.5, halfD))
-	buildFence(model, cframe, Vector3.new(-halfW, 0.5, halfD), Vector3.new(halfW, 0.5, halfD))
+	-- Low walls on the sides with a white trim; the front, facing the plaza, stays open
+	local halfW, halfD = PLOT_WIDTH / 2 + 0.25, PLOT_DEPTH / 2 + 0.25
+	for _, side in { -1, 1 } do
+		part({ Name = "Wall", Size = Vector3.new(1.5, 4, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(side * halfW, 2.5, 0), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
+		part({ Name = "Trim", Size = Vector3.new(1.9, 0.6, PLOT_DEPTH + 2.4), CFrame = cframe * CFrame.new(side * halfW, 4.8, 0), Color = white, Material = Enum.Material.SmoothPlastic, Parent = model })
+	end
+	-- Back wall: a tall facade that carries the owner's sign
+	part({ Name = "BackWall", Size = Vector3.new(PLOT_WIDTH + 3, 16, 1.5), CFrame = cframe * CFrame.new(0, 8.5, halfD), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
+	part({ Name = "BackTrim", Size = Vector3.new(PLOT_WIDTH + 3.4, 0.8, 1.9), CFrame = cframe * CFrame.new(0, 16.6, halfD), Color = white, Material = Enum.Material.SmoothPlastic, Parent = model })
+	for _, x in { -1, 1 } do
+		part({ Name = "Pillar", Size = Vector3.new(2.2, 17, 2.2), CFrame = cframe * CFrame.new(x * (PLOT_WIDTH / 2 + 0.5), 8.6, halfD), Color = color:Lerp(Color3.new(0, 0, 0), 0.25), Material = Enum.Material.SmoothPlastic, Parent = model })
+	end
 
 	-- Bushes in the back corners, flowers at the front
 	for _, side in { -1, 1 } do
@@ -175,24 +150,37 @@ local function buildPlot(index: number): Plot
 				Shape = Enum.PartType.Ball,
 				Size = Vector3.new(size, size, size),
 				CFrame = cframe * CFrame.new(side * (PLOT_WIDTH / 2 - 2.5 - (i - 1) * 3.4), 0.6 + size * 0.35, PLOT_DEPTH / 2 - 2.5 - (i - 1) * 1.5),
-				Color = Color3.fromRGB(70, 150, 65),
-				Material = Enum.Material.Grass,
+				Color = Color3.fromRGB(60, 190, 70),
+				Material = Enum.Material.SmoothPlastic,
 				Parent = model,
 			})
 		end
 		Assets.place("decor_flowers", model, (cframe * CFrame.new(side * (PLOT_WIDTH / 2 - 2.5), 0.6, -PLOT_DEPTH / 2 + 2.5)).Position)
 	end
 
-	-- Owner sign at the back, facing the middle: dark board in a wooden frame
-	local signCFrame = cframe * CFrame.new(0, 7.5, PLOT_DEPTH / 2 - 1.5)
-	part({ Name = "SignFrame", Size = Vector3.new(23.2, 8.2, 0.8), CFrame = signCFrame * CFrame.new(0, 0, 0.3), Color = WOOD, Material = Enum.Material.Wood, Parent = model })
-	local board = part({ Name = "Sign", Size = Vector3.new(22, 7, 0.6), CFrame = signCFrame, Color = Color3.fromRGB(35, 32, 50), Material = Enum.Material.SmoothPlastic, Parent = model })
-	for _, x in { -10, 10 } do
-		part({ Name = "SignPost", Size = Vector3.new(1, 4, 1), CFrame = cframe * CFrame.new(x, 2.4, PLOT_DEPTH / 2 - 1.2), Color = WOOD, Material = Enum.Material.Wood, Parent = model })
-	end
+	-- Owner sign on the facade: a light board with dark text, like a shop sign
+	local signCFrame = cframe * CFrame.new(0, 11, halfD - 1)
+	part({ Name = "SignFrame", Size = Vector3.new(25, 7.6, 0.6), CFrame = signCFrame * CFrame.new(0, 0, 0.1), Color = Color3.fromRGB(120, 80, 50), Material = Enum.Material.SmoothPlastic, Parent = model })
+	local board = part({ Name = "Sign", Size = Vector3.new(24, 6.6, 0.6), CFrame = signCFrame * CFrame.new(0, 0, -0.1), Color = Color3.fromRGB(245, 230, 195), Material = Enum.Material.SmoothPlastic, Parent = model })
 	local gui = surfaceGui(board, Enum.NormalId.Front, 30)
-	local sign = label(gui, { Position = UDim2.fromScale(0.05, 0.08), Size = UDim2.fromScale(0.9, 0.5), Text = "Free plot" })
-	local income = label(gui, { Position = UDim2.fromScale(0.05, 0.6), Size = UDim2.fromScale(0.9, 0.32), Text = "", TextColor3 = Color3.fromRGB(120, 255, 140) })
+	local sign = label(gui, { Position = UDim2.fromScale(0.04, 0.1), Size = UDim2.fromScale(0.92, 0.8), Text = "Free Base", TextColor3 = Color3.fromRGB(110, 70, 40) })
+	local signStroke = sign:FindFirstChildOfClass("UIStroke")
+	if signStroke then
+		signStroke:Destroy()
+	end
+
+	-- Huge income counter floating above the base
+	local anchor = part({ Name = "IncomeAnchor", Size = Vector3.new(1, 1, 1), CFrame = cframe * CFrame.new(0, 22, halfD), Transparency = 1, CanCollide = false, CanQuery = false, Parent = model })
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.fromScale(30, 6)
+	billboard.LightInfluence = 0
+	billboard.MaxDistance = 300
+	billboard.Parent = anchor
+	local income = label(billboard, { Size = UDim2.fromScale(1, 1), Text = "", TextColor3 = Color3.new(1, 1, 1) })
+	local incomeStroke = income:FindFirstChildOfClass("UIStroke")
+	if incomeStroke then
+		incomeStroke.Thickness = 4
+	end
 
 	-- Two rows of stands
 	local stands = {}
@@ -202,7 +190,7 @@ local function buildPlot(index: number): Plot
 		local column = (slot - 1) % perRow
 		local x = (column - (perRow - 1) / 2) * 10
 		local z = -6 + row * 13
-		stands[slot] = buildStand(model, cframe * CFrame.new(x, 0.6, z))
+		stands[slot] = buildStand(model, cframe * CFrame.new(x, 0.6, z), color)
 	end
 
 	return { index = index, cframe = cframe, model = model, owner = nil, stands = stands, sign = sign, income = income }
@@ -265,19 +253,41 @@ local function showCard(stand: Stand, key: string)
 	local _, yaw = top:ToOrientation()
 	Assets.place(cardId, stand.display, (top * CFrame.new(0, 0, 0.8)).Position, yaw)
 
-	-- Floating info
-	local billboard = Instance.new("BillboardGui")
+	-- Sparkles around rare cards and shiny variants
+	if Config.RARITY[card.rarity].order >= Config.RARITY.legendary.order or variantId ~= "normal" then
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		emitter.Color = ColorSequence.new(color)
+		emitter.LightEmission = 1
+		emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 0) })
+		emitter.Lifetime = NumberRange.new(1, 1.8)
+		emitter.Speed = NumberRange.new(1.5, 3)
+		emitter.SpreadAngle = Vector2.new(180, 180)
+		emitter.Rate = 4 + Config.RARITY[card.rarity].order * 2
+		emitter.Parent = cardPart
+	end
+
+	-- Floating info, like the big brainrot games: name, rarity in its color, Cash per second.
 	-- Sized in studs: it gets smaller with distance, so the 8 labels of a plot don't pile up
-	billboard.Size = UDim2.fromScale(7, 2.2)
-	billboard.StudsOffsetWorldSpace = Vector3.new(0, 8, 0)
-	billboard.MaxDistance = 35
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.fromScale(9, 3.6)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, Config.MODEL_HEIGHT + 4, 0)
+	billboard.MaxDistance = 60
 	billboard.LightInfluence = 0
 	billboard.Adornee = stand.base
 	billboard.Parent = stand.display
 	local prefix = if variantId == "normal" then "" else variant.name .. " "
 	local suffix = if grade then " [" .. grade.grade .. "]" else ""
-	label(billboard, { Size = UDim2.new(1, 0, 0.55, 0), Text = prefix .. card.name .. suffix, TextColor3 = color })
-	label(billboard, { Position = UDim2.fromScale(0, 0.55), Size = UDim2.new(1, 0, 0.45, 0), Text = "$" .. Format.number(Config.keyIncome(key)) .. "/s", TextColor3 = Color3.fromRGB(120, 255, 140) })
+	label(billboard, { Size = UDim2.fromScale(1, 0.36), Text = prefix .. card.name .. suffix })
+	local rarityLabel = label(billboard, { Position = UDim2.fromScale(0, 0.36), Size = UDim2.fromScale(1, 0.3), Text = string.upper(rarity.name), TextColor3 = rarity.color })
+	if card.rarity == "secret" or card.rarity == "divine" then
+		-- The top rarities get a rainbow name
+		rarityLabel.TextColor3 = Color3.new(1, 1, 1)
+		local gradient = Instance.new("UIGradient")
+		gradient.Color = CardArt.frameColors(cardId, "rainbow")
+		gradient.Parent = rarityLabel
+	end
+	label(billboard, { Position = UDim2.fromScale(0, 0.66), Size = UDim2.fromScale(1, 0.34), Text = "$" .. Format.number(Config.keyIncome(key)) .. "/s", TextColor3 = Color3.fromRGB(255, 225, 60) })
 end
 
 local function setStand(stand: Stand, key: string?)
@@ -286,7 +296,7 @@ local function setStand(stand: Stand, key: string?)
 	end
 	stand.key = key
 	stand.display:ClearAllChildren()
-	stand.ring.Color = Color3.fromRGB(90, 90, 105)
+	stand.ring.Color = stand.color:Lerp(Color3.new(1, 1, 1), 0.4)
 	stand.ring.Material = Enum.Material.SmoothPlastic
 	stand.light.Enabled = false
 	if key then
@@ -310,7 +320,7 @@ function Plots.assign(player: Player): boolean
 	for _, plot in plots do
 		if not plot.owner then
 			plot.owner = player
-			plot.sign.Text = player.DisplayName .. "'s Plot"
+			plot.sign.Text = player.DisplayName .. "'s Base"
 			player:SetAttribute("Plot", plot.index)
 			return true
 		end
@@ -324,7 +334,7 @@ function Plots.release(player: Player)
 		return
 	end
 	plot.owner = nil
-	plot.sign.Text = "Free plot"
+	plot.sign.Text = "Free Base"
 	plot.income.Text = ""
 	for _, stand in plot.stands do
 		setStand(stand, nil)

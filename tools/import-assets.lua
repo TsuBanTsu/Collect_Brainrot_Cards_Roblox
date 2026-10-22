@@ -2,7 +2,6 @@
 -- load them by itself. In Roblox Studio (edit mode, not Play): paste this whole file into
 -- the command bar (View > Command Bar) and press Enter, then save the place.
 -- The brainrot and decoration models land in ServerStorage > AssetLibrary, where Assets.luau finds them.
--- The hand-painted textures (MaterialVariants) land in MaterialService.
 -- Scripts inside the models are deleted. Running it again only adds the models still missing.
 
 local Config = require(game.ReplicatedStorage.Shared.Config)
@@ -48,25 +47,6 @@ for key, info in all do
 		end
 	end
 end
-local MaterialService = game:GetService("MaterialService")
-local textures = 0
-if not MaterialService:FindFirstChildWhichIsA("MaterialVariant", true) then
-	local ok, objects = pcall(function()
-		return game:GetObjects("rbxassetid://" .. Config.MATERIAL_PACK)
-	end)
-	if ok then
-		for _, object in objects do
-			for _, inst in object:GetDescendants() do
-				if inst:IsA("MaterialVariant") then
-					inst.Parent = MaterialService
-					textures += 1
-				end
-			end
-		end
-	else
-		warn("[Import] Texture pack failed: " .. tostring(objects))
-	end
-end
-print(string.format("[Import] %d models added, %d failed, %d textures added. Now save the place (Ctrl+S).", added, failed, textures))
+print(string.format("[Import] %d models added, %d failed. Now save the place (Ctrl+S).", added, failed))
 end)
 print("[Import] Started, wait for the summary line...")

@@ -400,7 +400,7 @@ end
 -- If a model is missing, the stand still shows the card itself.
 -- `height` in studs, `yaw` in degrees to turn the model so it faces forward.
 ---------------------------------------------------------------------------
-Config.MODEL_HEIGHT = 5
+Config.MODEL_HEIGHT = 7 -- bigger than a player, like in the big brainrot games
 -- Found on the Creator Store on 2026-10-22; no free model was found for the missing cards.
 Config.ASSETS = {
 	noobini = { id = 76207239035844 },
@@ -453,33 +453,24 @@ Config.DECOR = {
 ---------------------------------------------------------------------------
 -- Look of the world
 ---------------------------------------------------------------------------
--- Anime-style skybox (images from the free Creator Store model 13107361022)
+-- Bright cyan cartoon skybox (images from the free Creator Store model 72835926026092)
 Config.SKY = {
-	SkyboxBk = "rbxassetid://13107325341",
-	SkyboxDn = "rbxassetid://13107329809",
-	SkyboxFt = "rbxassetid://13107334845",
-	SkyboxLf = "rbxassetid://13107337703",
-	SkyboxRt = "rbxassetid://13107340396",
-	SkyboxUp = "rbxassetid://13107344387",
+	SkyboxBk = "rbxassetid://18351376859",
+	SkyboxDn = "rbxassetid://18351374919",
+	SkyboxFt = "rbxassetid://18351376800",
+	SkyboxLf = "rbxassetid://18351376469",
+	SkyboxRt = "rbxassetid://18351376457",
+	SkyboxUp = "rbxassetid://18351377189",
 }
 
--- Hand-painted textures (free Creator Store pack of MaterialVariants). They replace the
--- plain Roblox materials everywhere, terrain included: [Roblox material] = variant name and
--- how many studs one tile of the texture covers. Missing textures keep the plain material.
-Config.MATERIAL_PACK = 13591987222
-Config.MATERIAL_OVERRIDES = {
-	Grass = { variant = "Grass", tile = 14 },
-	Ground = { variant = "Dirt", tile = 12 },
-	Rock = { variant = "Stone", tile = 24 },
-	Sand = { variant = "Sand", tile = 12 },
-	WoodPlanks = { variant = "Planks", tile = 8 },
-	Wood = { variant = "Bark", tile = 6 },
-	Cobblestone = { variant = "Cobblestone", tile = 10 },
-	Brick = { variant = "Bricks", tile = 8 },
-	Pavement = { variant = "Tiles", tile = 10 },
-	Concrete = { variant = "Concrete", tile = 12 },
-	Fabric = { variant = "Cloth", tile = 6 },
-	Metal = { variant = "Iron", tile = 6 },
-} :: { [string]: { variant: string, tile: number } }
+-- One bright color per plot, like the colored bases of the big simulators
+Config.PLOT_COLORS = {
+	Color3.fromRGB(235, 70, 70),
+	Color3.fromRGB(60, 150, 255),
+	Color3.fromRGB(255, 170, 40),
+	Color3.fromRGB(170, 90, 255),
+	Color3.fromRGB(50, 200, 120),
+	Color3.fromRGB(255, 100, 190),
+} :: { Color3 }
 
 return Config
