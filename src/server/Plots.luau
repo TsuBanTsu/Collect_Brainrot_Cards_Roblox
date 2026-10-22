@@ -172,7 +172,7 @@ local function buildPlot(index: number): Plot
 	end
 
 	-- Huge income counter floating above the base
-	local anchor = part({ Name = "IncomeAnchor", Size = Vector3.new(1, 1, 1), CFrame = cframe * CFrame.new(0, 31, halfD), Transparency = 1, CanCollide = false, CanQuery = false, Parent = model })
+	local anchor = part({ Name = "IncomeAnchor", Size = Vector3.new(1, 1, 1), CFrame = cframe * CFrame.new(0, 27, halfD), Transparency = 1, CanCollide = false, CanQuery = false, Parent = model })
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.fromScale(30, 6)
 	billboard.LightInfluence = 0

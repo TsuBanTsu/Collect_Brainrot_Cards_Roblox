@@ -147,12 +147,6 @@ local function setupTerrain()
 		terrain:FillBlock(facing * CFrame.new(0, 37, 0), Vector3.new(58, 90, 60), Enum.Material.Air)
 		terrain:FillBlock(facing * CFrame.new(0, -6, 0), Vector3.new(58, 8, 52), Enum.Material.Water)
 	end
-	-- A few gentle bumps between the plots and the hills, so the ground isn't perfectly flat
-	for i = 0, 17 do
-		local angle = (i + 0.5) / 18 * math.pi * 2
-		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		terrain:FillBall(direction * rng:NextNumber(150, 230) + Vector3.new(0, -9, 0), rng:NextNumber(12, 18), Enum.Material.Grass)
-	end
 	-- Keep the middle flat (plaza and plots): clear anything above the ground there
 	terrain:FillBlock(CFrame.new(0, 30, 0), Vector3.new(MAP_SIZE, 60, MAP_SIZE), Enum.Material.Air)
 end
