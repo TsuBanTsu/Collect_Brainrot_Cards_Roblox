@@ -9,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local CardArt = require(ReplicatedStorage.Shared.CardArt)
 local Format = require(ReplicatedStorage.Shared.Format)
 
 local player = Players.LocalPlayer
@@ -23,14 +24,6 @@ local CASH_COLOR = Color3.fromRGB(120, 255, 140)
 local GREY = Color3.fromRGB(110, 110, 125)
 
 local profile = { cards = {}, stands = {}, packs = {}, backpackLevel = 0, index = {}, pity = {}, dailyDay = 0, dailyStreak = 0 }
-
-local RAINBOW = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
-	ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 220, 80)),
-	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 230, 120)),
-	ColorSequenceKeypoint.new(0.75, Color3.fromRGB(80, 160, 255)),
-	ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 90, 255)),
-})
 
 ---------------------------------------------------------------------------
 -- Small helpers to build the UI
@@ -96,10 +89,14 @@ local function button(props, onClick: () -> ())
 		TweenService:Create(scale, TweenInfo.new(0.06), { Scale = 0.93 }):Play()
 	end)
 	b.MouseButton1Up:Connect(function()
-		TweenService:Create(scale, TweenInfo.new(0.1), { Scale = 1 }):Play()
+		TweenService:Create(scale, TweenInfo.new(0.1), { Scale = 1.04 }):Play()
+	end)
+	-- Grows a little under the mouse
+	b.MouseEnter:Connect(function()
+		TweenService:Create(scale, TweenInfo.new(0.12), { Scale = 1.04 }):Play()
 	end)
 	b.MouseLeave:Connect(function()
-		scale.Scale = 1
+		TweenService:Create(scale, TweenInfo.new(0.12), { Scale = 1 }):Play()
 	end)
 	b.Activated:Connect(onClick)
 	return b
@@ -329,30 +326,18 @@ remotes.Announce.OnClientEvent:Connect(announce)
 ---------------------------------------------------------------------------
 -- A card drawn in the UI (reveal and Index)
 ---------------------------------------------------------------------------
-local function cardFrame(parent: Instance, cardId: string, variantId: string, size: UDim2): Frame
-	local card = Config.CARDS[cardId]
-	local rarity = Config.RARITY[card.rarity]
-	local frame = create("Frame", { Size = size, BackgroundColor3 = Color3.new(1, 1, 1), Parent = parent }, { corner(14), stroke(4, rarity.color) })
-	if variantId == "rainbow" then
-		create("UIGradient", { Rotation = 45, Color = RAINBOW, Parent = frame })
-	elseif variantId == "gold" then
-		create("UIGradient", { Rotation = 45, Color = ColorSequence.new(Color3.fromRGB(255, 235, 140), Color3.fromRGB(200, 140, 20)), Parent = frame })
-	elseif variantId == "holo" then
-		create("UIGradient", { Rotation = 45, Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 255, 245)),
-			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 180, 255)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(140, 200, 255)),
-		}), Parent = frame })
-	else
-		frame.BackgroundColor3 = rarity.color:Lerp(DARK, 0.55)
-	end
-	textLabel({ Position = UDim2.fromScale(0.06, 0.05), Size = UDim2.fromScale(0.88, 0.1), Text = rarity.name, TextColor3 = rarity.color, Parent = frame })
-	-- Big initials in the middle, until the 3D models get their own pictures
-	textLabel({ Position = UDim2.fromScale(0.1, 0.2), Size = UDim2.fromScale(0.8, 0.36), Text = string.upper(string.sub(card.name, 1, 1)), TextColor3 = Color3.new(1, 1, 1), Parent = frame })
-	textLabel({ Position = UDim2.fromScale(0.06, 0.6), Size = UDim2.fromScale(0.88, 0.2), Text = card.name, TextWrapped = true, Parent = frame })
-	if variantId ~= "normal" then
-		local variant = Config.VARIANT[variantId]
-		textLabel({ Position = UDim2.fromScale(0.06, 0.83), Size = UDim2.fromScale(0.88, 0.11), Text = string.upper(variant.name), TextColor3 = variant.color, Parent = frame })
+local function cardFrame(parent: Instance, cardId: string, variantId: string, size: UDim2, zIndex: number?, grade: Config.Grade?): Frame
+	local frame, shine = CardArt.build(parent, cardId, variantId, grade, zIndex)
+	frame.Size = size
+	-- Shiny cards: a light streak sweeps across them every few seconds
+	if shine then
+		task.spawn(function()
+			while frame.Parent do
+				shine.Position = UDim2.fromScale(-0.5, 0.5)
+				TweenService:Create(shine, TweenInfo.new(0.9, Enum.EasingStyle.Sine), { Position = UDim2.fromScale(1.5, 0.5) }):Play()
+				task.wait(if variantId == "holo" then 1.6 else 2.8)
+			end
+		end)
 	end
 	return frame
 end
@@ -372,6 +357,14 @@ local function makePanel(name: string, title: string, color: Color3, size: Vecto
 		Visible = false,
 		Parent = root,
 	}, { corner(18), stroke(3), gradient(PANEL, DARK) })
+	-- Pops open
+	local pop = create("UIScale", { Parent = panel })
+	panel:GetPropertyChangedSignal("Visible"):Connect(function()
+		if panel.Visible then
+			pop.Scale = 0.85
+			TweenService:Create(pop, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+		end
+	end)
 	local header = create("Frame", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = Color3.new(1, 1, 1), Parent = panel }, { corner(18), gradient(color, color:Lerp(Color3.new(0, 0, 0), 0.35)) })
 	textLabel({ Position = UDim2.fromOffset(16, 8), Size = UDim2.new(1, -80, 0, 36), Text = title, TextXAlignment = Enum.TextXAlignment.Left, Parent = header })
 	button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), Size = UDim2.fromOffset(40, 36), Text = "X", BackgroundColor3 = RED }, function()
@@ -531,13 +524,7 @@ local function showPull(slot: Frame, pull)
 	shrink:Play()
 	shrink.Completed:Wait()
 	back:Destroy()
-	local front = cardFrame(holder, pull.card, pull.variant, UDim2.fromScale(1, 1))
-	front.ZIndex = 12
-	for _, child in front:GetDescendants() do
-		if child:IsA("GuiObject") then
-			child.ZIndex = 13
-		end
-	end
+	cardFrame(holder, pull.card, pull.variant, UDim2.fromScale(1, 1), 12)
 	TweenService:Create(holder, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = CARD_SIZE }):Play()
 
 	local chance = textLabel({ Position = UDim2.new(0, 0, 1, -48), Size = UDim2.new(1, 0, 0, 34), Text = "1/" .. Format.number(pull.oneIn), TextColor3 = nameColor(pull.card, pull.variant), ZIndex = 13, Parent = slot })
@@ -816,13 +803,7 @@ showGrade = function(result)
 	gradeClose.Visible = false
 	gradeTitle.Text = "Grading " .. displayName(cardId, variantId) .. "..."
 	gradeTitle.TextColor3 = nameColor(cardId, variantId)
-	local front = cardFrame(gradeCardHolder, cardId, variantId, UDim2.fromScale(1, 1))
-	for _, child in front:GetDescendants() do
-		if child:IsA("GuiObject") then
-			child.ZIndex = 12
-		end
-	end
-	front.ZIndex = 11
+	cardFrame(gradeCardHolder, cardId, variantId, UDim2.fromScale(1, 1), 11)
 	gradeReveal.Visible = true
 
 	for index, criterion in Config.GRADE_CRITERIA do
@@ -848,6 +829,9 @@ showGrade = function(result)
 	end
 	task.wait(0.3)
 	gradeTitle.Text = displayName(cardId, variantId)
+	-- The card again, now with its grade badge
+	clearList(gradeCardHolder)
+	cardFrame(gradeCardHolder, cardId, variantId, UDim2.fromScale(1, 1), 11, grade)
 	gradeResult.Text = string.format("Average %.2f  ·  %s  ·  %s Cash", total / #result.scores, grade.name, Format.multiplier(grade.cash))
 	gradeResult.TextColor3 = grade.color
 	local pop = create("UIScale", { Scale = if grade.grade >= 8 then 1.8 else 1.2, Parent = gradeResult })
@@ -899,7 +883,7 @@ local function refreshIndex()
 		if profile.index[card.id] then
 			local frame = cardFrame(indexGrid, card.id, "normal", UDim2.fromOffset(150, 210))
 			frame.LayoutOrder = order
-			textLabel({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -4), Size = UDim2.new(0.9, 0, 0, 20), Text = "1/" .. Format.number(Config.oneIn(card.id, "normal")), Parent = frame })
+			textLabel({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -4), Size = UDim2.new(0.9, 0, 0, 20), Text = "1/" .. Format.number(Config.oneIn(card.id, "normal")), ZIndex = 10, Parent = frame })
 		else
 			local rarity = Config.RARITY[card.rarity]
 			create("Frame", { LayoutOrder = order, BackgroundColor3 = DARK, Parent = indexGrid }, {
@@ -972,9 +956,9 @@ local sideBar = create("Frame", {
 	Parent = root,
 }, { create("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }) })
 
-for order, entry in { { "Packs", PACKS_COLOR }, { "Cards", CARDS_COLOR }, { "Index", INDEX_COLOR }, { "Rewards", REWARDS_COLOR } } do
-	local name, color = entry[1], entry[2]
-	button({ LayoutOrder = order, Size = UDim2.fromOffset(150, 56), Text = string.upper(name), BackgroundColor3 = color }, function()
+for order, entry in { { "Packs", PACKS_COLOR, "📦" }, { "Cards", CARDS_COLOR, "🃏" }, { "Index", INDEX_COLOR, "📖" }, { "Rewards", REWARDS_COLOR, "🎁" } } do
+	local name, color, icon = entry[1], entry[2], entry[3]
+	button({ LayoutOrder = order, Size = UDim2.fromOffset(150, 56), Text = icon .. " " .. string.upper(name), BackgroundColor3 = color }, function()
 		togglePanel(name)
 	end).Parent = sideBar
 end

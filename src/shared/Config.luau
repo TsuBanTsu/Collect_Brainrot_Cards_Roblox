@@ -450,4 +450,36 @@ Config.DECOR = {
 	decor_magnifier = { id = 11935186507, size = 3 },
 } :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
 
+---------------------------------------------------------------------------
+-- Look of the world
+---------------------------------------------------------------------------
+-- Anime-style skybox (images from the free Creator Store model 13107361022)
+Config.SKY = {
+	SkyboxBk = "rbxassetid://13107325341",
+	SkyboxDn = "rbxassetid://13107329809",
+	SkyboxFt = "rbxassetid://13107334845",
+	SkyboxLf = "rbxassetid://13107337703",
+	SkyboxRt = "rbxassetid://13107340396",
+	SkyboxUp = "rbxassetid://13107344387",
+}
+
+-- Hand-painted textures (free Creator Store pack of MaterialVariants). They replace the
+-- plain Roblox materials everywhere, terrain included: [Roblox material] = variant name and
+-- how many studs one tile of the texture covers. Missing textures keep the plain material.
+Config.MATERIAL_PACK = 13591987222
+Config.MATERIAL_OVERRIDES = {
+	Grass = { variant = "Grass", tile = 14 },
+	Ground = { variant = "Dirt", tile = 12 },
+	Rock = { variant = "Stone", tile = 24 },
+	Sand = { variant = "Sand", tile = 12 },
+	WoodPlanks = { variant = "Planks", tile = 8 },
+	Wood = { variant = "Bark", tile = 6 },
+	Cobblestone = { variant = "Cobblestone", tile = 10 },
+	Brick = { variant = "Bricks", tile = 8 },
+	Pavement = { variant = "Tiles", tile = 10 },
+	Concrete = { variant = "Concrete", tile = 12 },
+	Fabric = { variant = "Cloth", tile = 6 },
+	Metal = { variant = "Iron", tile = 6 },
+} :: { [string]: { variant: string, tile: number } }
+
 return Config
