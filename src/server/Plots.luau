@@ -110,7 +110,7 @@ local function buildStand(plotModel: Model, cframe: CFrame): Stand
 	})
 	cylinder({ Name = "Pedestal", Size = Vector3.new(1.4, 6.6, 6.6), CFrame = upright(cframe * CFrame.new(0, 0.7, 0)), Color = Color3.fromRGB(235, 232, 240), Material = Enum.Material.Marble, Parent = plotModel })
 	cylinder({ Name = "Top", Size = Vector3.new(0.2, 6, 6), CFrame = upright(cframe * CFrame.new(0, 1.5, 0)), Color = Color3.fromRGB(45, 42, 60), Material = Enum.Material.Slate, Parent = plotModel })
-	local ring = cylinder({ Name = "Ring", Size = Vector3.new(0.3, 7, 7), CFrame = upright(cframe * CFrame.new(0, 1.5, 0)), Color = Color3.fromRGB(90, 90, 105), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = plotModel })
+	local ring = cylinder({ Name = "Ring", Size = Vector3.new(0.2, 7, 7), CFrame = upright(cframe * CFrame.new(0, 1.45, 0)), Color = Color3.fromRGB(90, 90, 105), Material = Enum.Material.SmoothPlastic, CanCollide = false, Parent = plotModel })
 	local light = Instance.new("PointLight")
 	light.Range = 10
 	light.Brightness = 1.2
