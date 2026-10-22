@@ -153,8 +153,8 @@ end
 ---------------------------------------------------------------------------
 local function buildGround()
 	-- Thick parts going down into the ground, so no gap shows whatever the terrain height
-	cylinder("Plaza", Vector3.new(0, -0.9, 0), RADIUS * 2, 3, Color3.fromRGB(235, 225, 200), Enum.Material.Pavement)
-	cylinder("PlazaRing", Vector3.new(0, -0.9, 0), RADIUS * 2 + 3, 2.8, Color3.fromRGB(180, 160, 130), Enum.Material.Cobblestone)
+	cylinder("Plaza", Vector3.new(0, -0.9, 0), RADIUS * 2, 3, Color3.fromRGB(225, 210, 185), Enum.Material.Cobblestone)
+	cylinder("PlazaRing", Vector3.new(0, -0.9, 0), RADIUS * 2 + 3, 2.8, Color3.fromRGB(175, 135, 110), Enum.Material.Brick)
 	cylinder("PlazaInner", Vector3.new(0, 0.2, 0), 26, 1, Color3.fromRGB(215, 200, 170), Enum.Material.Cobblestone)
 	for i = 0, PLOT_COUNT - 1 do
 		local angle = math.rad(i * 60)
