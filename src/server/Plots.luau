@@ -16,6 +16,7 @@ local PLOT_COUNT = 6 -- server size
 local PLOT_RADIUS = 78 -- distance from the middle of the map
 local PLOT_WIDTH = 46
 local PLOT_DEPTH = 38
+local MODEL_MAX_DEPTH = 7 -- deeper brainrot models are shrunk to fit behind the card
 local FONT = Enum.Font.FredokaOne
 
 type Stand = { base: BasePart, ring: BasePart, light: PointLight, display: Model, key: string?, color: Color3 }
@@ -79,9 +80,9 @@ local function buildCenter()
 	spawn.Parent = mapFolder
 
 	-- Big floating title in the middle
-	local anchor = part({ Name = "Title", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 28, 0), Transparency = 1, CanCollide = false, CanQuery = false, Parent = mapFolder })
+	local anchor = part({ Name = "Title", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 42, 0), Transparency = 1, CanCollide = false, CanQuery = false, Parent = mapFolder })
 	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.fromScale(40, 10)
+	billboard.Size = UDim2.fromScale(30, 7.5)
 	billboard.LightInfluence = 0
 	billboard.MaxDistance = 400
 	billboard.Parent = anchor
@@ -127,7 +128,7 @@ local function buildPlot(index: number): Plot
 
 	-- Studded floor in a light shade of the plot's color, on a base in the plot's color
 	part({ Name = "Curb", Size = Vector3.new(PLOT_WIDTH + 2, 2.5, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(0, -0.75, 0), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
-	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = color:Lerp(white, 0.6), Material = Enum.Material.Plastic, TopSurface = Enum.SurfaceType.Studs, Parent = model })
+	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = color:Lerp(white, 0.45), Material = Enum.Material.Plastic, TopSurface = Enum.SurfaceType.Studs, Parent = model })
 
 	-- Low walls on the sides with a white trim; the front, facing the plaza, stays open
 	local halfW, halfD = PLOT_WIDTH / 2 + 0.25, PLOT_DEPTH / 2 + 0.25
@@ -135,11 +136,11 @@ local function buildPlot(index: number): Plot
 		part({ Name = "Wall", Size = Vector3.new(1.5, 4, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(side * halfW, 2.5, 0), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
 		part({ Name = "Trim", Size = Vector3.new(1.9, 0.6, PLOT_DEPTH + 2.4), CFrame = cframe * CFrame.new(side * halfW, 4.8, 0), Color = white, Material = Enum.Material.SmoothPlastic, Parent = model })
 	end
-	-- Back wall: a tall facade that carries the owner's sign
-	part({ Name = "BackWall", Size = Vector3.new(PLOT_WIDTH + 3, 16, 1.5), CFrame = cframe * CFrame.new(0, 8.5, halfD), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
-	part({ Name = "BackTrim", Size = Vector3.new(PLOT_WIDTH + 3.4, 0.8, 1.9), CFrame = cframe * CFrame.new(0, 16.6, halfD), Color = white, Material = Enum.Material.SmoothPlastic, Parent = model })
+	-- Back wall: a tall facade that carries the owner's sign, high above the stands' labels
+	part({ Name = "BackWall", Size = Vector3.new(PLOT_WIDTH + 3, 24, 1.5), CFrame = cframe * CFrame.new(0, 12.5, halfD), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
+	part({ Name = "BackTrim", Size = Vector3.new(PLOT_WIDTH + 3.4, 0.8, 1.9), CFrame = cframe * CFrame.new(0, 24.6, halfD), Color = white, Material = Enum.Material.SmoothPlastic, Parent = model })
 	for _, x in { -1, 1 } do
-		part({ Name = "Pillar", Size = Vector3.new(2.2, 17, 2.2), CFrame = cframe * CFrame.new(x * (PLOT_WIDTH / 2 + 0.5), 8.6, halfD), Color = color:Lerp(Color3.new(0, 0, 0), 0.25), Material = Enum.Material.SmoothPlastic, Parent = model })
+		part({ Name = "Pillar", Size = Vector3.new(2.2, 25, 2.2), CFrame = cframe * CFrame.new(x * (PLOT_WIDTH / 2 + 0.5), 12.6, halfD), Color = color:Lerp(Color3.new(0, 0, 0), 0.25), Material = Enum.Material.SmoothPlastic, Parent = model })
 	end
 
 	-- Bushes in the back corners, flowers at the front
@@ -159,7 +160,7 @@ local function buildPlot(index: number): Plot
 	end
 
 	-- Owner sign on the facade: a light board with dark text, like a shop sign
-	local signCFrame = cframe * CFrame.new(0, 11, halfD - 1)
+	local signCFrame = cframe * CFrame.new(0, 19.5, halfD - 1)
 	part({ Name = "SignFrame", Size = Vector3.new(25, 7.6, 0.6), CFrame = signCFrame * CFrame.new(0, 0, 0.1), Color = Color3.fromRGB(120, 80, 50), Material = Enum.Material.SmoothPlastic, Parent = model })
 	local board = part({ Name = "Sign", Size = Vector3.new(24, 6.6, 0.6), CFrame = signCFrame * CFrame.new(0, 0, -0.1), Color = Color3.fromRGB(245, 230, 195), Material = Enum.Material.SmoothPlastic, Parent = model })
 	local gui = surfaceGui(board, Enum.NormalId.Front, 30)
@@ -170,7 +171,7 @@ local function buildPlot(index: number): Plot
 	end
 
 	-- Huge income counter floating above the base
-	local anchor = part({ Name = "IncomeAnchor", Size = Vector3.new(1, 1, 1), CFrame = cframe * CFrame.new(0, 22, halfD), Transparency = 1, CanCollide = false, CanQuery = false, Parent = model })
+	local anchor = part({ Name = "IncomeAnchor", Size = Vector3.new(1, 1, 1), CFrame = cframe * CFrame.new(0, 31, halfD), Transparency = 1, CanCollide = false, CanQuery = false, Parent = model })
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.fromScale(30, 6)
 	billboard.LightInfluence = 0
@@ -250,8 +251,19 @@ local function showCard(stand: Stand, key: string)
 	end
 
 	-- The brainrot model, if it could be loaded
-	local _, yaw = top:ToOrientation()
-	Assets.place(cardId, stand.display, (top * CFrame.new(0, 0, 0.8)).Position, yaw)
+	-- Set back by its own half depth so it never pokes through the card, and shrunk if
+	-- it's too deep for the pedestal
+	local model = Assets.get(cardId)
+	if model then
+		local depth = model:GetExtentsSize().Z
+		if depth > MODEL_MAX_DEPTH then
+			model:ScaleTo(model:GetScale() * MODEL_MAX_DEPTH / depth)
+			depth = MODEL_MAX_DEPTH
+		end
+		local _, yaw = top:ToOrientation()
+		model:PivotTo(CFrame.new((top * CFrame.new(0, 0, -1.6 + depth / 2)).Position) * CFrame.Angles(0, yaw, 0))
+		model.Parent = stand.display
+	end
 
 	-- Sparkles around rare cards and shiny variants
 	if Config.RARITY[card.rarity].order >= Config.RARITY.legendary.order or variantId ~= "normal" then

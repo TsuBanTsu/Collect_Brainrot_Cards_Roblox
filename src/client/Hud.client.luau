@@ -242,7 +242,7 @@ for _, attr in { "Cash", "Income", "BackpackUsed", "BackpackSize" } do
 end
 refreshStats()
 
--- "+$123" floating up from the Cash counter when money comes in
+-- "+$123" drifting down under the Cash counter, below the weather line when money comes in
 local lastCash = player:GetAttribute("Cash") or 0
 player:GetAttributeChangedSignal("Cash"):Connect(function()
 	local cash = player:GetAttribute("Cash") or 0
@@ -253,14 +253,14 @@ player:GetAttributeChangedSignal("Cash"):Connect(function()
 	end
 	local popup = textLabel({
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, math.random(-60, 60), 0, 110),
+		Position = UDim2.new(0.5, -210 + math.random(-40, 40), 0, 160),
 		Size = UDim2.fromOffset(200, 30),
 		Text = "+$" .. Format.number(gained),
 		TextColor3 = CASH_COLOR,
 		ZIndex = 5,
 		Parent = root,
 	})
-	TweenService:Create(popup, TweenInfo.new(1, Enum.EasingStyle.Quad), { Position = popup.Position - UDim2.fromOffset(0, 60), TextTransparency = 1 }):Play()
+	TweenService:Create(popup, TweenInfo.new(1, Enum.EasingStyle.Quad), { Position = popup.Position + UDim2.fromOffset(0, 40), TextTransparency = 1 }):Play()
 	local outline = popup:FindFirstChildOfClass("UIStroke")
 	if outline then
 		TweenService:Create(outline, TweenInfo.new(1), { Transparency = 1 }):Play()

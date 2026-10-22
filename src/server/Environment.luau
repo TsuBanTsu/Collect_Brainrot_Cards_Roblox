@@ -14,6 +14,7 @@ local Environment = {}
 local MAP_SIZE = 280 -- the studded baseplate in the middle, where the plaza and the plots are
 local HILLS_RADIUS = 300 -- the ring of hills around the map
 local WATER_RADIUS = 380 -- a lake ring behind the hills
+local GRASS = Color3.fromRGB(75, 200, 75)
 
 local function replace(className: string, props, parent: Instance?)
 	local target = parent or Lighting
@@ -32,7 +33,7 @@ end
 local function setupLighting()
 	Lighting.ClockTime = 13.5
 	Lighting.GeographicLatitude = 25
-	Lighting.Brightness = 2.6
+	Lighting.Brightness = 2.3
 	Lighting.EnvironmentDiffuseScale = 0.4
 	Lighting.EnvironmentSpecularScale = 0.3
 	-- Bright ambient light: shadows stay soft and colors stay vivid, like a cartoon
@@ -40,7 +41,7 @@ local function setupLighting()
 	Lighting.Ambient = Color3.fromRGB(110, 110, 120)
 	Lighting.GlobalShadows = true
 	Lighting.ShadowSoftness = 0.4
-	Lighting.ExposureCompensation = 0.15
+	Lighting.ExposureCompensation = 0
 
 	local sky = Config.SKY
 	replace("Sky", {
@@ -89,7 +90,7 @@ local function setupBaseplate()
 	baseplate.Anchored = true
 	baseplate.Size = Vector3.new(MAP_SIZE, 4, MAP_SIZE)
 	baseplate.Position = Vector3.new(0, -1.9, 0) -- top at y = 0.1, just above the terrain
-	baseplate.Color = Color3.fromRGB(75, 200, 75)
+	baseplate.Color = GRASS
 	baseplate.Material = Enum.Material.Plastic
 	baseplate.TopSurface = Enum.SurfaceType.Studs
 	baseplate.BottomSurface = Enum.SurfaceType.Smooth
@@ -101,7 +102,8 @@ local function setupTerrain()
 	terrain:Clear()
 
 	-- Bright cartoon colors for the terrain materials
-	terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(80, 200, 80))
+	-- Same green as the baseplate, so its edge doesn't show
+	terrain:SetMaterialColor(Enum.Material.Grass, GRASS)
 	terrain:SetMaterialColor(Enum.Material.LeafyGrass, Color3.fromRGB(60, 180, 70))
 	terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(170, 120, 70))
 	terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(150, 150, 165))

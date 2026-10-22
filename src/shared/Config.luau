@@ -400,7 +400,7 @@ end
 -- If a model is missing, the stand still shows the card itself.
 -- `height` in studs, `yaw` in degrees to turn the model so it faces forward.
 ---------------------------------------------------------------------------
-Config.MODEL_HEIGHT = 7 -- bigger than a player, like in the big brainrot games
+Config.MODEL_HEIGHT = 9 -- bigger than a player, like in the big brainrot games
 -- Found on the Creator Store on 2026-10-22; no free model was found for the missing cards.
 Config.ASSETS = {
 	noobini = { id = 76207239035844 },
