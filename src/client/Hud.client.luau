@@ -425,10 +425,10 @@ local reveal = create("Frame", {
 	ZIndex = 10,
 	Parent = root,
 })
-local revealTitle = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.12, 0), Size = UDim2.fromOffset(600, 44), Text = "", ZIndex = 11, Parent = reveal })
+local revealTitle = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.2, 0), Size = UDim2.fromOffset(600, 44), Text = "", ZIndex = 11, Parent = reveal })
 local revealRow = create("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.58),
 	Size = UDim2.fromOffset(760, 360),
 	BackgroundTransparency = 1,
 	ZIndex = 11,
@@ -449,8 +449,8 @@ end).Parent = revealButtons
 local CARD_SIZE = UDim2.fromOffset(200, 280)
 
 local function showPull(slot: Frame, pull)
-	local back = slot:FindFirstChild("Back") :: Frame
 	local holder = slot:FindFirstChild("Holder") :: Frame
+	local back = holder:FindFirstChild("Back") :: Frame
 	-- Flip: shrink the back to nothing, then grow the real card
 	local shrink = TweenService:Create(holder, TweenInfo.new(0.15), { Size = UDim2.fromOffset(0, 280) })
 	shrink:Play()
