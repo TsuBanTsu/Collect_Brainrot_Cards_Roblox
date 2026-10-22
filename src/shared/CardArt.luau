@@ -93,7 +93,8 @@ function CardArt.build(parent: Instance, cardId: string, variantId: string, grad
 	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(rarity.color:Lerp(Color3.new(1, 1, 1), 0.55), rarity.color:Lerp(DARK, 0.2)) }, window)
 	local image = CardArt.image(cardId)
 	if image ~= "" then
-		new("ImageLabel", { BackgroundTransparency = 1, Position = UDim2.fromScale(0.04, 0.04), Size = UDim2.fromScale(0.92, 0.92), Image = image, ScaleType = Enum.ScaleType.Fit, ZIndex = z + 3 }, window)
+		-- Thumbnails leave a lot of empty space around the model: zoomed in (the window clips it)
+		new("ImageLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.55), Size = UDim2.fromScale(1.5, 1.5), Image = image, ScaleType = Enum.ScaleType.Fit, ZIndex = z + 3 }, window)
 	else
 		text(window, { Position = UDim2.fromScale(0.2, 0.15), Size = UDim2.fromScale(0.6, 0.7), Text = string.upper(string.sub(card.name, 1, 1)), ZIndex = z + 3 })
 	end
