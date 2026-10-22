@@ -127,9 +127,9 @@ local function buildPlot(index: number): Plot
 	model.Name = "Plot" .. index
 	model.Parent = mapFolder
 
-	-- Studded floor in a light shade of the plot's color, on a base in the plot's color
+	-- Studded floor in a slightly lighter shade of the plot's color, on a base in the plot's color
 	part({ Name = "Curb", Size = Vector3.new(PLOT_WIDTH + 2, 2.5, PLOT_DEPTH + 2), CFrame = cframe * CFrame.new(0, -0.75, 0), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
-	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = color:Lerp(white, 0.45), Material = Enum.Material.Plastic, TopSurface = Enum.SurfaceType.Studs, Parent = model })
+	part({ Name = "Floor", Size = Vector3.new(PLOT_WIDTH, 0.6, PLOT_DEPTH), CFrame = cframe * CFrame.new(0, 0.3, 0), Color = color:Lerp(white, 0.2), Material = Enum.Material.Plastic, TopSurface = Enum.SurfaceType.Studs, Parent = model })
 
 	-- Low walls on the sides with a white trim; the front, facing the plaza, stays open
 	local halfW, halfD = PLOT_WIDTH / 2 + 0.25, PLOT_DEPTH / 2 + 0.25
