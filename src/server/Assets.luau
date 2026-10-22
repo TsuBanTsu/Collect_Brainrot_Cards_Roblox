@@ -66,6 +66,10 @@ local function fetch(key: string, info): Model?
 	if saved and saved:IsA("Model") then
 		return saved:Clone()
 	end
+	if info.id == 0 then
+		warn(string.format("[Assets] '%s' is missing from ServerStorage.AssetLibrary: run tools/import-from-pack.lua", key))
+		return nil
+	end
 	local ok, result = pcall(AssetService.LoadAssetAsync, AssetService, info.id)
 	if not ok or not result then
 		warn(string.format("[Assets] Could not load '%s' (%d): %s", key, info.id, tostring(result)))
@@ -97,7 +101,8 @@ end
 function Assets.loadAll()
 	folder = Instance.new("Folder")
 	folder.Name = "AssetTemplates"
-	folder.Parent = ServerStorage
+	-- Replicated so that the cards can show the 3D model (CardArt.luau); the models carry no scripts
+	folder.Parent = ReplicatedStorage
 
 	local pending = 0
 	for _, list in { Config.ASSETS, Config.DECOR } do

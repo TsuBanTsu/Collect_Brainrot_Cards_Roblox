@@ -1,6 +1,9 @@
 -- Draws a card: frame colored by rarity (gold, rainbow or holo for variants), the brainrot's
--- picture (the thumbnail of its Creator Store model), its name, rarity and grade.
+-- picture (its 3D model in a ViewportFrame, or else the thumbnail of its Creator Store model),
+-- its name, rarity and grade.
 -- Used by the UI and by the cards standing on the plots (SurfaceGui).
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(script.Parent.Config)
 
@@ -63,7 +66,30 @@ end
 -- The picture of a card: the thumbnail of its 3D model, or "" if it has none
 function CardArt.image(cardId: string): string
 	local asset = Config.ASSETS[cardId]
-	return if asset then string.format("rbxthumb://type=Asset&id=%d&w=420&h=420", asset.id) else ""
+	return if asset and asset.id ~= 0 then string.format("rbxthumb://type=Asset&id=%d&w=420&h=420", asset.id) else ""
+end
+
+-- The loaded 3D model of a card (Assets.luau puts them in ReplicatedStorage.AssetTemplates)
+local function template(cardId: string): Model?
+	local templates = ReplicatedStorage:FindFirstChild("AssetTemplates")
+	local model = templates and templates:FindFirstChild(cardId)
+	return if model and model:IsA("Model") then model else nil
+end
+
+-- Shows the model in a ViewportFrame, seen from the front and a bit from above
+local function viewport(window: Frame, model: Model, z: number)
+	local view = new("ViewportFrame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Ambient = Color3.fromRGB(200, 200, 200), LightColor = Color3.new(1, 1, 1), LightDirection = Vector3.new(-1, -1, 1), ZIndex = z }, window)
+	local copy = model:Clone()
+	copy.Parent = view
+	local box, size = copy:GetBoundingBox()
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 40
+	local distance = (size.Magnitude / 2) / math.tan(math.rad(20)) * 0.9
+	-- Models face -Z: the camera stands on that side
+	local direction = Vector3.new(0.35, 0.3, -1).Unit
+	camera.CFrame = CFrame.lookAt(box.Position + direction * distance, box.Position)
+	camera.Parent = view
+	view.CurrentCamera = camera
 end
 
 -- Builds the card inside `parent` (filling it). Returns the card frame and its "shine"
@@ -91,8 +117,11 @@ function CardArt.build(parent: Instance, cardId: string, variantId: string, grad
 	local window = new("Frame", { Position = UDim2.fromScale(0.07, 0.12), Size = UDim2.fromScale(0.86, 0.52), BackgroundColor3 = Color3.new(1, 1, 1), ClipsDescendants = true, ZIndex = z + 2 }, inner)
 	new("UICorner", { CornerRadius = UDim.new(0.08, 0) }, window)
 	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(rarity.color:Lerp(Color3.new(1, 1, 1), 0.55), rarity.color:Lerp(DARK, 0.2)) }, window)
+	local model = template(cardId)
 	local image = CardArt.image(cardId)
-	if image ~= "" then
+	if model then
+		viewport(window, model, z + 3)
+	elseif image ~= "" then
 		-- Thumbnails leave a lot of empty space around the model: zoomed in (the window clips it)
 		new("ImageLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.55), Size = UDim2.fromScale(1.5, 1.5), Image = image, ScaleType = Enum.ScaleType.Fit, ZIndex = z + 3 }, window)
 	else

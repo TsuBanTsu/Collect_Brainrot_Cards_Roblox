@@ -401,7 +401,9 @@ end
 -- `height` in studs, `yaw` in degrees to turn the model so it faces forward.
 ---------------------------------------------------------------------------
 Config.MODEL_HEIGHT = 9 -- bigger than a player, like in the big brainrot games
--- Found on the Creator Store on 2026-10-22; no free model was found for the missing cards.
+-- Found on the Creator Store on 2026-10-22. tools/import-from-pack.lua replaces them in the place
+-- with the blocky models of the free "Brainrot Pack [150+]" (137461628889541), saved in
+-- ServerStorage > AssetLibrary. id = 0: the model only exists in that library.
 Config.ASSETS = {
 	noobini = { id = 76207239035844 },
 	lirili = { id = 77231614368559 },
@@ -433,6 +435,12 @@ Config.ASSETS = {
 	strawberry = { id = 14964355116 },
 	trictrac = { id = 97300319440209 },
 	blueberrinni = { id = 93308616326000 },
+	fluriflura = { id = 0 },
+	svinino = { id = 0 },
+	rhino = { id = 0 },
+	cocofanto = { id = 0 },
+	matteo = { id = 0 },
+	garama = { id = 0 },
 } :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
 
 -- Free Creator Store models that decorate the plaza (same loading as the brainrots).
