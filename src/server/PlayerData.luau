@@ -43,6 +43,9 @@ local function defaultProfile()
 		DailyDay = 0, -- day number of the last daily reward claimed
 		DailyStreak = 0,
 		Codes = {}, -- [code] = true once redeemed
+		Team = {}, -- card keys of the tower team (the cards stay where they are)
+		Towers = {}, -- [towerId] = highest floor cleared
+		TraitRerolls = 0,
 	}
 end
 
@@ -79,7 +82,7 @@ end
 local function setupLeaderstats(player: Player)
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
-	for _, name in { "Cash", "Packs" } do
+	for _, name in { "Cash", "Packs", "Infinite" } do
 		local value = Instance.new("NumberValue")
 		value.Name = name
 		value.Parent = leaderstats
@@ -207,8 +210,8 @@ function PlayerData.addCash(player: Player, amount: number)
 	PlayerData.updateStats(player)
 end
 
-function PlayerData.addCard(profile, cardId: string, variantId: string, scores: { number }?)
-	local key = Config.cardKey(cardId, variantId, scores)
+function PlayerData.addCard(profile, cardId: string, variantId: string, scores: { number }?, traitId: string?)
+	local key = Config.cardKey(cardId, variantId, scores, traitId)
 	profile.Cards[key] = (profile.Cards[key] or 0) + 1
 	profile.Index[cardId] = true
 end
@@ -256,6 +259,31 @@ function PlayerData.removeCard(profile, key: string, count: number): boolean
 	return true
 end
 
+-- How many copies of a card key the player owns, in the backpack and on the stands
+function PlayerData.ownedCount(profile, key: string): number
+	local count = profile.Cards[key] or 0
+	for _, standKey in profile.Stands do
+		if standKey == key then
+			count += 1
+		end
+	end
+	return count
+end
+
+-- The team without the cards the player no longer owns (sold, graded, given a trait...)
+function PlayerData.validTeam(profile): { string }
+	local team, used = {}, {}
+	for _, key in profile.Team do
+		if type(key) == "string" and #team < Config.TEAM_SIZE then
+			used[key] = (used[key] or 0) + 1
+			if used[key] <= PlayerData.ownedCount(profile, key) then
+				table.insert(team, key)
+			end
+		end
+	end
+	return team
+end
+
 ---------------------------------------------------------------------------
 -- Syncing to the client
 ---------------------------------------------------------------------------
@@ -278,7 +306,8 @@ function PlayerData.updateStats(player: Player, weatherCash: number?)
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
 		(leaderstats:FindFirstChild("Cash") :: NumberValue).Value = math.floor(profile.Cash);
-		(leaderstats:FindFirstChild("Packs") :: NumberValue).Value = profile.PacksOpened
+		(leaderstats:FindFirstChild("Packs") :: NumberValue).Value = profile.PacksOpened;
+		(leaderstats:FindFirstChild("Infinite") :: NumberValue).Value = profile.Towers.infinite or 0
 	end
 end
 
@@ -301,6 +330,9 @@ function PlayerData.sync(player: Player)
 		pity = profile.Pity,
 		dailyDay = profile.DailyDay,
 		dailyStreak = profile.DailyStreak,
+		team = PlayerData.validTeam(profile),
+		towers = profile.Towers,
+		traitRerolls = profile.TraitRerolls,
 	})
 end
 

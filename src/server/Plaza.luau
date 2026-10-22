@@ -1,5 +1,5 @@
 -- The plaza in the middle of the map: a fountain, the paths to the plots, decoration
--- and the 3 stations (Shop, Sell, Grading). Each station has a prompt (key E) that opens
+-- and the 4 stations (Shop, Sell, Grading, Towers). Each station has a prompt (key E) that opens
 -- its panel on the player's screen; the server checks the player is close before acting.
 
 local Assets = require(script.Parent.Assets)
@@ -21,6 +21,7 @@ Plaza.STATIONS = {
 	{ id = "shop", name = "PACK SHOP", color = Color3.fromRGB(90, 200, 120), angle = 270, prompt = "Buy packs" },
 	{ id = "sell", name = "SELL", color = Color3.fromRGB(255, 190, 60), angle = 30, prop = "decor_register", prompt = "Sell cards" },
 	{ id = "grade", name = "GRADING", color = Color3.fromRGB(170, 110, 255), angle = 150, prop = "decor_magnifier", prompt = "Grade cards" },
+	{ id = "towers", name = "TOWERS", color = Color3.fromRGB(255, 80, 90), angle = 90, prompt = "Fight in the towers" },
 } :: { Station }
 
 local positions: { [string]: Vector3 } = {}
@@ -132,7 +133,7 @@ local function buildDecoration()
 			buildLamp(direction * (RADIUS - 3) + side * s * 8 + Vector3.new(0, FLOOR, 0))
 		end
 		local benchAngle = math.rad(i * 60 + 30)
-		if i % 2 == 1 then -- between the stations
+		if i % 2 == 1 and i ~= 1 then -- between the stations (the Towers station takes the bench's place at 90 degrees)
 			local benchDirection = Vector3.new(math.cos(benchAngle), 0, math.sin(benchAngle))
 			local cframe = CFrame.lookAt(benchDirection * (RADIUS - 6), Vector3.zero)
 			local _, yaw = cframe:ToOrientation()

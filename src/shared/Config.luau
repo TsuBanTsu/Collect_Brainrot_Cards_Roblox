@@ -259,31 +259,62 @@ function Config.gradeFromScores(scores: { number }): Grade
 end
 
 ---------------------------------------------------------------------------
--- Owned cards are stored as "cardId|variantId", or "cardId|variantId|9.10.8.9"
--- once graded (the 4 scores). Identical cards stack under the same key.
+-- Traits: a bonus a card gets from a Trait Reroll (won in the towers). A card has at most
+-- one trait; rerolling replaces it. `hp` and `dmg` multiply its tower stats, `cash` its
+-- Cash per second (and not its stats).
 ---------------------------------------------------------------------------
-function Config.cardKey(cardId: string, variantId: string, scores: { number }?): string
-	if scores then
-		return cardId .. "|" .. variantId .. "|" .. table.concat(scores, ".")
-	end
-	return cardId .. "|" .. variantId
+export type Trait = { id: string, name: string, weight: number, hp: number, dmg: number, cash: number, color: Color3 }
+
+Config.TRAITS = {
+	{ id = "dmg", name = "DMG Boost", weight = 1, hp = 1, dmg = 1.3, cash = 1, color = Color3.fromRGB(255, 110, 80) },
+	{ id = "hp", name = "HP Boost", weight = 1, hp = 1.3, dmg = 1, cash = 1, color = Color3.fromRGB(90, 230, 120) },
+	{ id = "coin", name = "Coin Boost", weight = 1, hp = 1, dmg = 1, cash = 1.3, color = Color3.fromRGB(255, 215, 60) },
+} :: { Trait }
+
+Config.TRAIT = {} :: { [string]: Trait }
+for _, trait in Config.TRAITS do
+	Config.TRAIT[trait.id] = trait
 end
 
--- Returns the card id, the variant id and the 4 scores (nil if the card isn't graded)
-function Config.splitKey(key: string): (string, string, { number }?)
+---------------------------------------------------------------------------
+-- Owned cards are stored as "cardId|variantId", then "|9.10.8.9" once graded (the 4 scores)
+-- and "|traitId" once it has a trait ("cardId|variantId||hp" for a trait without a grade).
+-- Identical cards stack under the same key.
+---------------------------------------------------------------------------
+function Config.cardKey(cardId: string, variantId: string, scores: { number }?, traitId: string?): string
+	local key = cardId .. "|" .. variantId
+	if scores or traitId then
+		key ..= "|" .. (if scores then table.concat(scores, ".") else "")
+	end
+	if traitId then
+		key ..= "|" .. traitId
+	end
+	return key
+end
+
+-- Returns the card id, the variant id, the 4 scores (nil if the card isn't graded)
+-- and the trait id (nil if it has none)
+function Config.splitKey(key: string): (string, string, { number }?, string?)
 	local parts = string.split(key, "|")
 	if #parts < 2 then
-		return key, "normal", nil
+		return key, "normal", nil, nil
 	end
 	local scores: { number }? = nil
-	if parts[3] then
+	if parts[3] and parts[3] ~= "" then
 		local list = {}
 		for _, score in string.split(parts[3], ".") do
 			table.insert(list, tonumber(score) or 1)
 		end
 		scores = list
 	end
-	return parts[1], parts[2], scores
+	local traitId = if parts[4] and Config.TRAIT[parts[4]] then parts[4] else nil
+	return parts[1], parts[2], scores, traitId
+end
+
+-- The trait of a card key, or nil if it has none
+function Config.keyTrait(key: string): Trait?
+	local _, _, _, traitId = Config.splitKey(key)
+	return if traitId then Config.TRAIT[traitId] else nil
 end
 
 -- The grade of a card key, or nil if it isn't graded
@@ -302,11 +333,27 @@ function Config.cardIncome(cardId: string, variantId: string): number
 	return Config.RARITY[card.rarity].cash * Config.PACK[card.pack].cash * variant.cash
 end
 
--- Same, for an owned card key (its grade included)
+-- Same, for an owned card key (its grade and trait included)
 function Config.keyIncome(key: string): number
 	local cardId, variantId = Config.splitKey(key)
 	local grade = Config.keyGrade(key)
-	return Config.cardIncome(cardId, variantId) * (if grade then grade.cash else 1)
+	local trait = Config.keyTrait(key)
+	return Config.cardIncome(cardId, variantId) * (if grade then grade.cash else 1) * (if trait then trait.cash else 1)
+end
+
+-- Tower stats of a card: the more Cash it makes, the stronger it is. Only its rarity, pack
+-- and variant count (not its grade nor a Coin Boost), then the HP or DMG Boost of its trait.
+Config.CARD_HP = 10 -- HP per $1/s
+Config.CARD_DMG = 2 -- DMG per $1/s
+
+function Config.keyStats(key: string): { hp: number, dmg: number }
+	local cardId, variantId = Config.splitKey(key)
+	local power = Config.cardIncome(cardId, variantId)
+	local trait = Config.keyTrait(key)
+	return {
+		hp = math.ceil(power * Config.CARD_HP * (if trait then trait.hp else 1)),
+		dmg = math.ceil(power * Config.CARD_DMG * (if trait then trait.dmg else 1)),
+	}
 end
 
 ---------------------------------------------------------------------------
@@ -369,6 +416,153 @@ Config.CODES = {
 -- Index bonus multiplier for a number of completed packs
 function Config.indexMultiplier(completedPacks: number): number
 	return 1 + Config.INDEX_BONUS * completedPacks
+end
+
+---------------------------------------------------------------------------
+-- Towers: a team of TEAM_SIZE cards fights floor after floor, automatically. Each floor has
+-- one enemy brainrot; the front card and the enemy headbutt each other until one falls,
+-- then the next card steps in. HP carry over from floor to floor (it's an endurance test).
+-- Enemy power on floor f = start x growth^(f-1), with the same HP and DMG per power as cards.
+-- `floors` = nil: the tower never ends (Infinite).
+-- `packs`: the pack used for the enemies and the pack rewards, from a floor on.
+-- `bossCards`: the card won for the first clear of each boss (1st boss, 2nd boss...), a random
+-- card of that pack and rarity; the last one repeats.
+---------------------------------------------------------------------------
+export type Tower = {
+	id: string,
+	name: string,
+	order: number,
+	floors: number?,
+	color: Color3,
+	start: number,
+	growth: number,
+	packs: { { from: number, pack: string } },
+	bossCards: { { pack: string, rarity: string } },
+}
+
+Config.TEAM_SIZE = 3
+
+Config.TOWERS = {
+	{
+		id = "easy",
+		name = "Easy Tower",
+		order = 1,
+		floors = 100,
+		color = Color3.fromRGB(110, 220, 110),
+		start = 0.5,
+		growth = 1.07,
+		packs = { { from = 1, pack = "starter" }, { from = 50, pack = "italian" } },
+		bossCards = { { pack = "italian", rarity = "legendary" } },
+	},
+	{
+		id = "medium",
+		name = "Medium Tower",
+		order = 2,
+		floors = 200,
+		color = Color3.fromRGB(255, 190, 40),
+		start = 100,
+		growth = 1.0437,
+		packs = { { from = 1, pack = "italian" }, { from = 100, pack = "chaos" } },
+		bossCards = { { pack = "chaos", rarity = "legendary" }, { pack = "chaos", rarity = "mythic" } },
+	},
+	{
+		id = "hard",
+		name = "Hard Tower",
+		order = 3,
+		floors = 300,
+		color = Color3.fromRGB(255, 70, 90),
+		start = 20000,
+		growth = 1.0313,
+		packs = { { from = 1, pack = "chaos" }, { from = 100, pack = "sky" }, { from = 200, pack = "galaxy" } },
+		bossCards = { { pack = "sky", rarity = "legendary" }, { pack = "sky", rarity = "mythic" }, { pack = "galaxy", rarity = "mythic" } },
+	},
+	{
+		id = "infinite",
+		name = "Infinite Tower",
+		order = 4,
+		floors = nil,
+		color = Color3.fromRGB(170, 90, 255),
+		start = 1,
+		growth = 1.06,
+		packs = { { from = 1, pack = "starter" }, { from = 50, pack = "italian" }, { from = 150, pack = "chaos" }, { from = 250, pack = "sky" }, { from = 350, pack = "galaxy" } },
+		bossCards = { { pack = "italian", rarity = "legendary" }, { pack = "chaos", rarity = "mythic" }, { pack = "sky", rarity = "mythic" }, { pack = "galaxy", rarity = "mythic" }, { pack = "galaxy", rarity = "secret" } },
+	},
+} :: { Tower }
+
+Config.TOWER = {} :: { [string]: Tower }
+for _, tower in Config.TOWERS do
+	Config.TOWER[tower.id] = tower
+end
+
+-- Mini-bosses and bosses: stronger enemies, bigger rewards. `scale` is the size of their model.
+export type FloorKind = { id: string, name: string, every: number, hp: number, dmg: number, gold: number, scale: number }
+
+Config.FLOOR_KINDS = {
+	boss = { id = "boss", name = "BOSS", every = 100, hp = 10, dmg = 2, gold = 10, scale = 1.9 },
+	miniboss = { id = "miniboss", name = "MINI-BOSS", every = 10, hp = 3, dmg = 1.5, gold = 3, scale = 1.4 },
+	normal = { id = "normal", name = "", every = 1, hp = 1, dmg = 1, gold = 1, scale = 1 },
+} :: { [string]: FloorKind }
+
+-- After each floor the team heals this share of its max HP (fallen cards stay down),
+-- and fully after each mini-boss and boss
+Config.TOWER_HEAL = 0.1
+
+-- Rewards. A floor cleared for the first time gives the full Cash; cleared again, only RERUN_GOLD of it.
+Config.TOWER_GOLD_SECONDS = 20 -- Cash per floor = enemy power x this
+Config.TOWER_RERUN_GOLD = 0.25
+-- First clear: packs for each mini-boss (MINIBOSS_PACKS_BIG on floors that are a multiple of 50)
+-- and BOSS_PACKS + a card for each boss. Cleared again: a chance of one pack.
+Config.TOWER_MINIBOSS_PACKS = 1
+Config.TOWER_MINIBOSS_PACKS_BIG = 2
+Config.TOWER_BOSS_PACKS = 2
+Config.TOWER_RERUN_MINIBOSS_PACK_CHANCE = 0.15
+Config.TOWER_RERUN_BOSS_PACK_CHANCE = 0.4
+-- A Trait Reroll every TRAIT_FLOORS floors, first clear or not
+Config.TOWER_TRAIT_FLOORS = 5
+
+-- Pace of the fights, in seconds
+Config.TOWER_CLASH_TIME = 0.75 -- one headbutt
+Config.TOWER_FLOOR_TIME = 0.8 -- the enemy comes in (also the pause after a boss)
+Config.TOWER_CLEAR_TIME = 0.4 -- the pause after a normal floor
+
+function Config.floorKind(floor: number): FloorKind
+	if floor % Config.FLOOR_KINDS.boss.every == 0 then
+		return Config.FLOOR_KINDS.boss
+	elseif floor % Config.FLOOR_KINDS.miniboss.every == 0 then
+		return Config.FLOOR_KINDS.miniboss
+	end
+	return Config.FLOOR_KINDS.normal
+end
+
+function Config.enemyPower(tower: Tower, floor: number): number
+	return tower.start * tower.growth ^ (floor - 1)
+end
+
+function Config.enemyStats(tower: Tower, floor: number): { hp: number, dmg: number }
+	local power = Config.enemyPower(tower, floor)
+	local kind = Config.floorKind(floor)
+	return { hp = math.ceil(power * Config.CARD_HP * kind.hp), dmg = math.ceil(power * Config.CARD_DMG * kind.dmg) }
+end
+
+-- Cash for clearing a floor for the first time
+function Config.floorGold(tower: Tower, floor: number): number
+	return math.max(1, math.floor(Config.enemyPower(tower, floor) * Config.TOWER_GOLD_SECONDS * Config.floorKind(floor).gold))
+end
+
+-- The pack of the enemies and pack rewards on a floor
+function Config.towerPack(tower: Tower, floor: number): string
+	local packId = tower.packs[1].pack
+	for _, entry in tower.packs do
+		if floor >= entry.from then
+			packId = entry.pack
+		end
+	end
+	return packId
+end
+
+function Config.towerBossCard(tower: Tower, floor: number): { pack: string, rarity: string }
+	local index = math.clamp(floor // Config.FLOOR_KINDS.boss.every, 1, #tower.bossCards)
+	return tower.bossCards[index]
 end
 
 ---------------------------------------------------------------------------
