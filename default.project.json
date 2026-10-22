@@ -1,0 +1,28 @@
+{
+  "name": "collect-brainrot-cards",
+  "tree": {
+    "$className": "DataModel",
+    "AssetService": {
+      "$properties": {
+        "AllowInsertFreeAssets": true
+      }
+    },
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    }
+  }
+}
