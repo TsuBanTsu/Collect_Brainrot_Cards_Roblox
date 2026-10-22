@@ -1,8 +1,9 @@
--- Player UI: cash, weather, packs (with the card reveal), cards and stands, Index,
--- rewards and notifications. Everything is created from code. Sizes are designed for a
+-- Player UI: cash, weather, backpack, packs (with the card reveal), cards and stands, Index,
+-- rewards, notifications and the plaza stations (Shop, Sell, Grading). Everything is created from code. Sizes are designed for a
 -- 1280x720 screen and a UIScale resizes the whole UI to fit any screen.
 
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
@@ -21,7 +22,7 @@ local RED = Color3.fromRGB(225, 75, 75)
 local CASH_COLOR = Color3.fromRGB(120, 255, 140)
 local GREY = Color3.fromRGB(110, 110, 125)
 
-local profile = { cards = {}, stands = {}, index = {}, pity = {}, dailyDay = 0, dailyStreak = 0 }
+local profile = { cards = {}, stands = {}, packs = {}, backpackLevel = 0, index = {}, pity = {}, dailyDay = 0, dailyStreak = 0 }
 
 local RAINBOW = ColorSequence.new({
 	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
@@ -144,6 +145,29 @@ local function nameColor(cardId: string, variantId: string): Color3
 	return Config.VARIANT[variantId].color
 end
 
+-- "Gold Tralalero Tralala [MINT 9]" for an owned card key
+local function keyName(key: string): string
+	local cardId, variantId = Config.splitKey(key)
+	local grade = Config.keyGrade(key)
+	return displayName(cardId, variantId) .. (if grade then " [" .. grade.name .. "]" else "")
+end
+
+-- Most valuable first
+local function sortedKeys(cards: { [string]: number }): { string }
+	local keys = {}
+	for key in cards do
+		table.insert(keys, key)
+	end
+	table.sort(keys, function(a, b)
+		local ia, ib = Config.keyIncome(a), Config.keyIncome(b)
+		if ia ~= ib then
+			return ia > ib
+		end
+		return a < b
+	end)
+	return keys
+end
+
 ---------------------------------------------------------------------------
 -- Screen setup
 ---------------------------------------------------------------------------
@@ -189,7 +213,7 @@ watchCamera()
 local statsBar = create("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0, 44),
-	Size = UDim2.fromOffset(440, 64),
+	Size = UDim2.fromOffset(650, 64),
 	BackgroundColor3 = Color3.new(1, 1, 1),
 	Parent = root,
 }, {
@@ -207,12 +231,16 @@ end
 
 local cashValue = statBox(1, "CASH", CASH_COLOR)
 local incomeValue = statBox(2, "PER SECOND", Color3.fromRGB(255, 220, 80))
+local backpackValue = statBox(3, "BACKPACK", Color3.fromRGB(120, 190, 255))
 
 local function refreshStats()
 	cashValue.Text = "$" .. Format.number(player:GetAttribute("Cash") or 0)
 	incomeValue.Text = "$" .. Format.number(player:GetAttribute("Income") or 0) .. "/s"
+	local used, size = player:GetAttribute("BackpackUsed") or 0, player:GetAttribute("BackpackSize") or Config.BACKPACK_SLOTS
+	backpackValue.Text = used .. "/" .. size
+	backpackValue.TextColor3 = if used >= size then RED else Color3.new(1, 1, 1)
 end
-for _, attr in { "Cash", "Income" } do
+for _, attr in { "Cash", "Income", "BackpackUsed", "BackpackSize" } do
 	player:GetAttributeChangedSignal(attr):Connect(refreshStats)
 end
 refreshStats()
@@ -360,15 +388,13 @@ local function togglePanel(name: string)
 end
 
 ---------------------------------------------------------------------------
--- Packs
+-- My packs: the packs in the backpack, opened whenever the player wants
 ---------------------------------------------------------------------------
 local PACKS_COLOR = Color3.fromRGB(255, 150, 60)
-local packsPanel = makePanel("Packs", "PACKS", PACKS_COLOR, Vector2.new(700, 480))
+local packsPanel = makePanel("Packs", "MY PACKS", PACKS_COLOR, Vector2.new(700, 480))
 local packsList = scrollingList({ Position = UDim2.fromOffset(14, 64), Size = UDim2.new(1, -28, 1, -76), Parent = packsPanel }, 8)
 
 local openPack: (string) -> ()
-local packButtons: { [string]: TextButton } = {}
-local pityLabels: { [string]: TextLabel } = {}
 
 local function oddsText(pack: Config.Pack): string
 	local parts = {}
@@ -381,38 +407,87 @@ local function oddsText(pack: Config.Pack): string
 	return table.concat(parts, "  ")
 end
 
-for _, pack in Config.PACKS do
-	local row = create("Frame", { LayoutOrder = pack.order, Size = UDim2.new(1, -10, 0, 90), BackgroundColor3 = Color3.new(1, 1, 1), Parent = packsList }, { corner(12), stroke(2), gradient(pack.color:Lerp(DARK, 0.45), pack.color:Lerp(DARK, 0.75)) })
-	textLabel({ Position = UDim2.fromOffset(14, 6), Size = UDim2.fromOffset(330, 32), Text = pack.name, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-	textLabel({ Position = UDim2.fromOffset(350, 10), Size = UDim2.fromOffset(150, 26), Text = "$" .. Format.number(pack.price), TextColor3 = CASH_COLOR, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-	textLabel({ Position = UDim2.fromOffset(14, 40), Size = UDim2.fromOffset(500, 20), Text = oddsText(pack), RichText = true, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-	pityLabels[pack.id] = textLabel({ Position = UDim2.fromOffset(14, 64), Size = UDim2.fromOffset(500, 18), Text = "", TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-	local b = button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(130, 52), Text = "OPEN", BackgroundColor3 = ACCENT }, function()
-		openPack(pack.id)
-	end)
-	b.Parent = row
-	packButtons[pack.id] = b
+local function pityText(pack: Config.Pack): string
+	for rarityId in pack.odds do
+		if Config.RARITY[rarityId].order < Config.RARITY[Config.PITY_RARITY].order then
+			local left = Config.PITY_PACKS - (profile.pity[pack.id] or 0)
+			return string.format("%s or better guaranteed in %d pack%s", Config.RARITY[Config.PITY_RARITY].name, left, if left > 1 then "s" else "")
+		end
+	end
+	return ""
+end
+
+-- A pack row with its name, odds and a line under them; buttons are added by the caller
+local function packRow(parent: Instance, pack: Config.Pack, title: string, info: string): Frame
+	local row = create("Frame", { LayoutOrder = pack.order, Size = UDim2.new(1, -10, 0, 90), BackgroundColor3 = Color3.new(1, 1, 1), Parent = parent }, { corner(12), stroke(2), gradient(pack.color:Lerp(DARK, 0.45), pack.color:Lerp(DARK, 0.75)) })
+	textLabel({ Position = UDim2.fromOffset(14, 6), Size = UDim2.fromOffset(420, 32), Text = title, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+	textLabel({ Position = UDim2.fromOffset(14, 40), Size = UDim2.fromOffset(440, 20), Text = oddsText(pack), RichText = true, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+	textLabel({ Position = UDim2.fromOffset(14, 64), Size = UDim2.fromOffset(440, 18), Text = info, TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+	return row
 end
 
 local function refreshPacks()
-	local cash = player:GetAttribute("Cash") or 0
+	clearList(packsList)
+	local any = false
 	for _, pack in Config.PACKS do
-		setButtonColor(packButtons[pack.id], if cash >= pack.price then ACCENT else GREY)
-		local hasPity = false
-		for rarityId in pack.odds do
-			if Config.RARITY[rarityId].order < Config.RARITY[Config.PITY_RARITY].order then
-				hasPity = true
-			end
-		end
-		if hasPity then
-			local left = Config.PITY_PACKS - (profile.pity[pack.id] or 0)
-			pityLabels[pack.id].Text = string.format("%s or better guaranteed in %d pack%s", Config.RARITY[Config.PITY_RARITY].name, left, if left > 1 then "s" else "")
-		else
-			pityLabels[pack.id].Text = ""
+		local count = profile.packs[pack.id] or 0
+		if count > 0 then
+			any = true
+			local row = packRow(packsList, pack, pack.name .. "  x" .. count, pityText(pack))
+			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(130, 52), Text = "OPEN", BackgroundColor3 = ACCENT }, function()
+				openPack(pack.id)
+			end).Parent = row
 		end
 	end
+	if not any then
+		textLabel({ Size = UDim2.new(1, -10, 0, 60), Text = "No packs yet: buy some at the Pack Shop in the middle of the map!", TextWrapped = true, TextColor3 = GREY, Parent = packsList })
+	end
 end
-player:GetAttributeChangedSignal("Cash"):Connect(refreshPacks)
+
+---------------------------------------------------------------------------
+-- Pack Shop (plaza station): packs go to the backpack, bigger backpacks
+---------------------------------------------------------------------------
+local SHOP_COLOR = Color3.fromRGB(90, 200, 120)
+local shopPanel = makePanel("Shop", "PACK SHOP", SHOP_COLOR, Vector2.new(760, 500))
+local shopList = scrollingList({ Position = UDim2.fromOffset(14, 64), Size = UDim2.new(1, -28, 1, -76), Parent = shopPanel }, 8)
+local buyButtons: { { button: TextButton, price: number } } = {}
+local upgradeRow = create("Frame", { LayoutOrder = 100, Size = UDim2.new(1, -10, 0, 70), BackgroundColor3 = Color3.new(1, 1, 1), Parent = shopList }, { corner(12), stroke(2), gradient(Color3.fromRGB(70, 110, 170), Color3.fromRGB(35, 50, 80)) })
+local upgradeText = textLabel({ Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -230, 0, 54), Text = "", TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, Parent = upgradeRow })
+local upgradeButton = button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(190, 52), Text = "UPGRADE", BackgroundColor3 = ACCENT }, function()
+	remotes.UpgradeBackpack:FireServer()
+end)
+upgradeButton.Parent = upgradeRow
+
+for _, pack in Config.PACKS do
+	local row = packRow(shopList, pack, pack.name, "$" .. Format.number(pack.price) .. " each  ·  goes to your backpack")
+	for index, count in { 1, 5 } do
+		local b = button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12 - (2 - index) * 128, 0.5, 0), Size = UDim2.fromOffset(118, 52), Text = "BUY x" .. count, BackgroundColor3 = ACCENT }, function()
+			remotes.BuyPack:FireServer(pack.id, count)
+		end)
+		b.Parent = row
+		table.insert(buyButtons, { button = b, price = pack.price * count })
+	end
+end
+
+local function refreshShop()
+	local cash = player:GetAttribute("Cash") or 0
+	for _, entry in buyButtons do
+		setButtonColor(entry.button, if cash >= entry.price then ACCENT else GREY)
+	end
+	local level = profile.backpackLevel or 0
+	local upgrade = Config.BACKPACK_UPGRADES[level + 1]
+	local label = upgradeButton:FindFirstChild("Label") :: TextLabel
+	if upgrade then
+		upgradeText.Text = string.format("Backpack: %d slots  →  %d slots", Config.backpackSize(level), Config.backpackSize(level + 1))
+		label.Text = "$" .. Format.number(upgrade.price)
+		setButtonColor(upgradeButton, if cash >= upgrade.price then ACCENT else GREY)
+	else
+		upgradeText.Text = string.format("Backpack: %d slots (the biggest one!)", Config.backpackSize(level))
+		label.Text = "MAX"
+		setButtonColor(upgradeButton, GREY)
+	end
+end
+player:GetAttributeChangedSignal("Cash"):Connect(refreshShop)
 
 ---------------------------------------------------------------------------
 -- Pack opening: the cards flip one by one with their "1 in X" chance underneath
@@ -481,8 +556,8 @@ openPack = function(packId: string)
 		return
 	end
 	local pack = Config.PACK[packId]
-	if (player:GetAttribute("Cash") or 0) < pack.price then
-		toast("Not enough Cash for the " .. pack.name, RED)
+	if (profile.packs[packId] or 0) < 1 then
+		toast("No " .. pack.name .. " left: buy more at the Pack Shop", RED)
 		return
 	end
 	opening = true
@@ -535,7 +610,7 @@ end
 ---------------------------------------------------------------------------
 local CARDS_COLOR = Color3.fromRGB(80, 160, 255)
 local cardsPanel = makePanel("Cards", "MY CARDS", CARDS_COLOR, Vector2.new(900, 480))
-textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.fromOffset(300, 26), Text = "Inventory", TextXAlignment = Enum.TextXAlignment.Left, Parent = cardsPanel })
+local backpackTitle = textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.fromOffset(300, 26), Text = "Backpack", TextXAlignment = Enum.TextXAlignment.Left, Parent = cardsPanel })
 local inventoryList = scrollingList({ Position = UDim2.fromOffset(12, 92), Size = UDim2.new(0, 560, 1, -104), Parent = cardsPanel })
 local standsTitle = textLabel({ Position = UDim2.fromOffset(590, 60), Size = UDim2.fromOffset(150, 26), Text = "Stands", TextXAlignment = Enum.TextXAlignment.Left, Parent = cardsPanel })
 button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 58), Size = UDim2.fromOffset(150, 30), Text = "PLACE BEST", BackgroundColor3 = ACCENT }, function()
@@ -543,34 +618,34 @@ button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 58), S
 end).Parent = cardsPanel
 local standsList = scrollingList({ Position = UDim2.fromOffset(584, 92), Size = UDim2.new(1, -596, 1, -104), Parent = cardsPanel })
 
-local function cardRow(parent: Instance, order: number, key: string, count: number?)
+local function cardRow(parent: Instance, order: number, key: string, count: number?, buttonsWidth: number?)
 	local cardId, variantId = Config.splitKey(key)
 	local row = create("Frame", { LayoutOrder = order, Size = UDim2.new(1, -10, 0, 48), BackgroundColor3 = PANEL, Parent = parent }, { corner(8), stroke(1.5) })
 	local suffix = if count and count > 1 then "  x" .. count else ""
-	textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -20, 0, 22), Text = displayName(cardId, variantId) .. suffix, TextColor3 = nameColor(cardId, variantId), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-	textLabel({ Position = UDim2.fromOffset(10, 26), Size = UDim2.fromOffset(260, 18), Text = "$" .. Format.number(Config.cardIncome(cardId, variantId)) .. "/s  ·  1/" .. Format.number(Config.oneIn(cardId, variantId)), TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+	local width = -20 - (buttonsWidth or 0)
+	textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, width, 0, 22), Text = keyName(key) .. suffix, TextColor3 = nameColor(cardId, variantId), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+	textLabel({ Position = UDim2.fromOffset(10, 26), Size = UDim2.new(1, width, 0, 18), Text = "$" .. Format.number(Config.keyIncome(key)) .. "/s  ·  1/" .. Format.number(Config.oneIn(cardId, variantId)), TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
 	return row
 end
 
 local function refreshCards()
 	clearList(inventoryList)
-	local keys = {}
-	for key in profile.cards do
-		table.insert(keys, key)
+	local inBackpack = 0
+	for _, list in { profile.cards, profile.packs } do
+		for _, count in list do
+			inBackpack += count
+		end
 	end
-	table.sort(keys, function(a, b)
-		local ca, va = Config.splitKey(a)
-		local cb, vb = Config.splitKey(b)
-		return Config.cardIncome(ca, va) > Config.cardIncome(cb, vb)
-	end)
+	backpackTitle.Text = string.format("Backpack %d/%d (cards and packs)", inBackpack, Config.backpackSize(profile.backpackLevel or 0))
+	local keys = sortedKeys(profile.cards)
 	for order, key in keys do
 		local count = profile.cards[key]
-		local row = cardRow(inventoryList, order, key, count)
+		local _, variantId, scores = Config.splitKey(key)
+		local nextVariant = if scores then nil else Config.FUSE_NEXT[variantId]
+		local row = cardRow(inventoryList, order, key, count, if nextVariant then 256 else 100)
 		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(90, 36), Text = "PLACE", BackgroundColor3 = ACCENT }, function()
 			remotes.PlaceCard:FireServer(key)
 		end).Parent = row
-		local _, variantId = Config.splitKey(key)
-		local nextVariant = Config.FUSE_NEXT[variantId]
 		if nextVariant then
 			local canFuse = count >= Config.FUSE_COUNT
 			local fuse = button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -106, 0.5, 0), Size = UDim2.fromOffset(150, 36), Text = string.format("FUSE %d/%d", math.min(count, Config.FUSE_COUNT), Config.FUSE_COUNT), BackgroundColor3 = if canFuse then Config.VARIANT[nextVariant].color:Lerp(DARK, 0.2) else GREY }, function()
@@ -584,7 +659,7 @@ local function refreshCards()
 		end
 	end
 	if #keys == 0 then
-		textLabel({ Size = UDim2.new(1, -10, 0, 30), Text = "No cards yet: open a pack!", TextColor3 = GREY, Parent = inventoryList })
+		textLabel({ Size = UDim2.new(1, -10, 0, 30), Text = "No cards yet: buy a pack at the Pack Shop and open it!", TextColor3 = GREY, Parent = inventoryList })
 	end
 
 	clearList(standsList)
@@ -593,7 +668,7 @@ local function refreshCards()
 		local key = profile.stands[tostring(slot)]
 		if key then
 			used += 1
-			local row = cardRow(standsList, slot, key)
+			local row = cardRow(standsList, slot, key, nil, 50)
 			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(40, 36), Text = "X", BackgroundColor3 = RED }, function()
 				remotes.RemoveCard:FireServer(slot)
 			end).Parent = row
@@ -606,6 +681,178 @@ local function refreshCards()
 		end
 	end
 	standsTitle.Text = string.format("Stands %d/%d", used, Config.STAND_COUNT)
+end
+
+---------------------------------------------------------------------------
+-- Sell (plaza station): cards for Config.SELL_SECONDS of their Cash, packs for part of their price
+---------------------------------------------------------------------------
+local SELL_COLOR = Color3.fromRGB(255, 190, 60)
+local sellPanel = makePanel("Sell", "SELL", SELL_COLOR, Vector2.new(760, 500))
+textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.new(1, -32, 0, 22), Text = string.format("Cards sell for %d seconds of their Cash. Cards on your stands can't be sold.", Config.SELL_SECONDS), TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = sellPanel })
+local sellList = scrollingList({ Position = UDim2.fromOffset(12, 92), Size = UDim2.new(1, -24, 1, -104), Parent = sellPanel })
+
+-- A row with "SELL 1" and "SELL ALL" buttons
+local function sellRow(order: number, title: string, color: Color3, info: string, count: number, onSell: (number) -> ())
+	local row = create("Frame", { LayoutOrder = order, Size = UDim2.new(1, -10, 0, 48), BackgroundColor3 = PANEL, Parent = sellList }, { corner(8), stroke(1.5) })
+	textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -250, 0, 22), Text = title .. (if count > 1 then "  x" .. count else ""), TextColor3 = color, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+	textLabel({ Position = UDim2.fromOffset(10, 26), Size = UDim2.new(1, -250, 0, 18), Text = info, TextColor3 = CASH_COLOR, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+	button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -118, 0.5, 0), Size = UDim2.fromOffset(100, 36), Text = "SELL 1", BackgroundColor3 = SELL_COLOR:Lerp(DARK, 0.2) }, function()
+		onSell(1)
+	end).Parent = row
+	if count > 1 then
+		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(100, 36), Text = "SELL ALL", BackgroundColor3 = RED }, function()
+			onSell(count)
+		end).Parent = row
+	end
+end
+
+local function refreshSell()
+	clearList(sellList)
+	local order = 0
+	for _, pack in Config.PACKS do
+		local count = profile.packs[pack.id] or 0
+		if count > 0 then
+			order += 1
+			sellRow(order, pack.name, pack.color, "$" .. Format.number(Config.packSellPrice(pack.id)) .. " each", count, function(amount)
+				remotes.SellPack:FireServer(pack.id, amount)
+			end)
+		end
+	end
+	-- Cheapest cards first: they are the ones players usually sell
+	local keys = sortedKeys(profile.cards)
+	for i = #keys, 1, -1 do
+		local key = keys[i]
+		local cardId, variantId = Config.splitKey(key)
+		order += 1
+		sellRow(order, keyName(key), nameColor(cardId, variantId), "$" .. Format.number(Config.sellPrice(key)) .. " each", profile.cards[key], function(amount)
+			remotes.SellCard:FireServer(key, amount)
+		end)
+	end
+	if order == 0 then
+		textLabel({ Size = UDim2.new(1, -10, 0, 30), Text = "Nothing to sell", TextColor3 = GREY, Parent = sellList })
+	end
+end
+
+---------------------------------------------------------------------------
+-- Grading (plaza station): 4 scores from 1 to 10, the average gives the grade
+---------------------------------------------------------------------------
+local GRADE_COLOR = Color3.fromRGB(170, 110, 255)
+local gradePanel = makePanel("Grade", "GRADING", GRADE_COLOR, Vector2.new(760, 500))
+do
+	local parts = {}
+	for i = #Config.GRADES, 1, -1 do
+		local grade = Config.GRADES[i]
+		if grade.cash > 1 then
+			table.insert(parts, string.format('<font color="#%s">%d: %s</font>', grade.color:ToHex(), grade.grade, Format.multiplier(grade.cash)))
+		end
+	end
+	textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.new(1, -32, 0, 22), Text = "Grade multiplies Cash and sell price  ·  " .. table.concat(parts, "  "), RichText = true, TextXAlignment = Enum.TextXAlignment.Left, Parent = gradePanel })
+end
+local gradeList = scrollingList({ Position = UDim2.fromOffset(12, 92), Size = UDim2.new(1, -24, 1, -104), Parent = gradePanel })
+local showGrade: (any) -> ()
+local grading = false
+
+local function refreshGrade()
+	clearList(gradeList)
+	local order = 0
+	for _, key in sortedKeys(profile.cards) do
+		local cardId, variantId, scores = Config.splitKey(key)
+		if not scores then
+			order += 1
+			local cost = Config.gradeCost(cardId, variantId)
+			local row = create("Frame", { LayoutOrder = order, Size = UDim2.new(1, -10, 0, 48), BackgroundColor3 = PANEL, Parent = gradeList }, { corner(8), stroke(1.5) })
+			local count = profile.cards[key]
+			textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -220, 0, 22), Text = keyName(key) .. (if count > 1 then "  x" .. count else ""), TextColor3 = nameColor(cardId, variantId), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+			textLabel({ Position = UDim2.fromOffset(10, 26), Size = UDim2.new(1, -220, 0, 18), Text = "$" .. Format.number(Config.keyIncome(key)) .. "/s", TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+			local canPay = (player:GetAttribute("Cash") or 0) >= cost
+			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(190, 36), Text = "GRADE $" .. Format.number(cost), BackgroundColor3 = if canPay then GRADE_COLOR else GREY }, function()
+				if grading then
+					return
+				end
+				if (player:GetAttribute("Cash") or 0) < cost then
+					toast("Not enough Cash to grade this card", RED)
+					return
+				end
+				grading = true
+				local result = remotes.Grade:InvokeServer(key)
+				if result then
+					showGrade(result)
+				end
+				grading = false
+			end).Parent = row
+		end
+	end
+	if order == 0 then
+		textLabel({ Size = UDim2.new(1, -10, 0, 30), Text = "No card to grade: graded cards can't be graded again", TextColor3 = GREY, Parent = gradeList })
+	end
+end
+
+-- The grading result: the 4 scores appear one by one, then the grade
+local gradeReveal = create("Frame", {
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.new(0, 0, 0),
+	BackgroundTransparency = 0.35,
+	Visible = false,
+	ZIndex = 10,
+	Parent = root,
+})
+local gradeCardHolder = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, -200, 0.52, 0), Size = CARD_SIZE, BackgroundTransparency = 1, ZIndex = 11, Parent = gradeReveal })
+local gradeScores = create("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0.5, -60, 0.48, 0), Size = UDim2.fromOffset(360, 230), BackgroundTransparency = 1, ZIndex = 11, Parent = gradeReveal }, {
+	create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+local gradeTitle = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.16, 0), Size = UDim2.fromOffset(700, 44), Text = "", ZIndex = 11, Parent = gradeReveal })
+local gradeResult = textLabel({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0.5, -60, 0.48, 125), Size = UDim2.fromOffset(360, 44), Text = "", ZIndex = 12, Parent = gradeReveal })
+local gradeClose = button({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0.9, 0), Size = UDim2.fromOffset(160, 56), Text = "OK", BackgroundColor3 = ACCENT, ZIndex = 12 }, function()
+	gradeReveal.Visible = false
+end)
+gradeClose.Parent = gradeReveal
+
+showGrade = function(result)
+	local cardId, variantId = Config.splitKey(result.key)
+	local grade = Config.keyGrade(result.key) :: Config.Grade
+	clearList(gradeCardHolder)
+	clearList(gradeScores)
+	gradeResult.Text = ""
+	gradeClose.Visible = false
+	gradeTitle.Text = "Grading " .. displayName(cardId, variantId) .. "..."
+	gradeTitle.TextColor3 = nameColor(cardId, variantId)
+	local front = cardFrame(gradeCardHolder, cardId, variantId, UDim2.fromScale(1, 1))
+	for _, child in front:GetDescendants() do
+		if child:IsA("GuiObject") then
+			child.ZIndex = 12
+		end
+	end
+	front.ZIndex = 11
+	gradeReveal.Visible = true
+
+	for index, criterion in Config.GRADE_CRITERIA do
+		local score = result.scores[index]
+		local row = create("Frame", { LayoutOrder = index, Size = UDim2.new(1, 0, 0, 44), BackgroundColor3 = PANEL, ZIndex = 11, Parent = gradeScores }, { corner(8), stroke(1.5) })
+		textLabel({ Position = UDim2.fromOffset(12, 6), Size = UDim2.new(0.6, 0, 1, -12), Text = criterion, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12, Parent = row })
+		local value = textLabel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 4), Size = UDim2.new(0.3, 0, 1, -8), Text = "", TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 12, Parent = row })
+		-- The number rolls for a moment before landing on the score
+		for _ = 1, 8 do
+			value.Text = tostring(math.random(1, 10))
+			task.wait(0.05)
+		end
+		value.Text = tostring(score)
+		value.TextColor3 = if score >= 9 then Color3.fromRGB(255, 215, 60) elseif score >= 7 then CASH_COLOR else Color3.new(1, 1, 1)
+		local pop = create("UIScale", { Scale = 1.5, Parent = value })
+		TweenService:Create(pop, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+		task.wait(0.35)
+	end
+
+	local total = 0
+	for _, score in result.scores do
+		total += score
+	end
+	task.wait(0.3)
+	gradeTitle.Text = displayName(cardId, variantId)
+	gradeResult.Text = string.format("Average %.2f  ·  %s  ·  %s Cash", total / #result.scores, grade.name, Format.multiplier(grade.cash))
+	gradeResult.TextColor3 = grade.color
+	local pop = create("UIScale", { Scale = if grade.grade >= 8 then 1.8 else 1.2, Parent = gradeResult })
+	TweenService:Create(pop, TweenInfo.new(0.6, Enum.EasingStyle.Elastic), { Scale = 1 }):Play()
+	gradeClose.Visible = true
 end
 
 ---------------------------------------------------------------------------
@@ -737,6 +984,9 @@ end
 ---------------------------------------------------------------------------
 local function refreshAll()
 	refreshPacks()
+	refreshShop()
+	refreshSell()
+	refreshGrade()
 	refreshCards()
 	refreshIndex()
 	refreshRewards()
@@ -745,6 +995,38 @@ end
 remotes.ProfileSync.OnClientEvent:Connect(function(data)
 	profile = data
 	refreshAll()
+end)
+
+---------------------------------------------------------------------------
+-- Plaza stations: their prompt (key E) opens their panel, walking away closes it
+---------------------------------------------------------------------------
+local STATION_PANELS = { shop = "Shop", sell = "Sell", grade = "Grade" }
+local stationPrompt: ProximityPrompt? = nil
+
+ProximityPromptService.PromptTriggered:Connect(function(prompt)
+	local panelName = STATION_PANELS[prompt:GetAttribute("Station") or ""]
+	if panelName then
+		stationPrompt = prompt
+		for key, panel in panels do
+			panel.Visible = key == panelName
+		end
+	end
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(0.5)
+		local prompt = stationPrompt
+		local character = player.Character
+		local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local spot = prompt and prompt.Parent :: BasePart?
+		if prompt and spot and rootPart and (rootPart.Position - spot.Position).Magnitude > 20 then
+			stationPrompt = nil
+			for _, name in STATION_PANELS do
+				panels[name].Visible = false
+			end
+		end
+	end
 end)
 refreshAll()
 remotes.RequestSync:FireServer()

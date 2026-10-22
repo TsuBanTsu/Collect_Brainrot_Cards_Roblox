@@ -4,10 +4,16 @@ A Roblox card collecting game inspired by *Collect Cat Cards!*: open packs of br
 
 ## The game
 
-- **Packs** (PACKS button): 5 packs, from the Starter Pack ($50) to the Galaxy Pack ($10M). Each pack gives 3 cards and has its own odds: the cheap rarities fade out and rarer ones (up to Divine) show up as packs get more expensive.
+- **The plaza**: in the middle of the map, around a fountain, with 3 stands you use with the **E** key:
+  - **Pack Shop**: buy packs (x1 or x5) and bigger backpacks. Bought packs go to your backpack.
+  - **Sell**: sell cards (for 60 seconds of their Cash) and unopened packs (half their price).
+  - **Grading**: grade a card (see below).
+- **Packs** (PACKS button): the packs in your backpack, opened whenever you want, anywhere. 5 packs, from the Starter Pack ($50) to the Galaxy Pack ($10M). Each pack gives 3 cards and has its own odds: the cheap rarities fade out and rarer ones (up to Divine) show up as packs get more expensive.
+- **Backpack**: 50 slots to start; every card and every unopened pack takes one (cards on the stands don't). When it's full you can't buy or open packs: sell cards or buy a bigger backpack at the Pack Shop (up to 300 slots).
+- **Grading**: a card gets 4 scores from 1 to 10 (Centering, Corners, Edges, Surface). The average gives its grade, which multiplies its Cash and sell price: 10 (average 9.5+) x5 at 0.5%, 9 x3 at 2%, 8 x2 at 8%, 7 x1.6 at 14.5%, 6 x1.3 at 25%, 5 x1.15 at 25%, below x1 at 25%. It costs the card's pack price x its variant multiplier. A card is graded once, and graded cards can't be fused. Grades 9 and 10 are announced to the server.
 - **The reveal**: cards flip one by one, rarest last. Under each card, its chance is shown as **1/X**: the base chance of that exact card in that pack, with its variant applied (a Holo at 0.5% multiplies X by 200). Luck buffs never change the number shown.
 - **Variants**: every card rolls its own variant, whatever the pack: Holo 0.5%, Rainbow 5%, Gold 20%. A card has a single variant, the rarest one rolled wins. Variants multiply the card's Cash (x50, x10, x3).
-- **Fusion** (CARDS button): 5 identical cards fuse into the next variant (normal → Gold → Rainbow → Holo).
+- **Fusion** (CARDS button): 5 identical ungraded cards fuse into the next variant (normal → Gold → Rainbow → Holo).
 - **Stands**: each player gets a plot with 8 stands. Cards on stands earn Cash every second (rarity × pack × variant), shown above each stand and on the plot's sign. PLACE BEST fills the stands with the best cards.
 - **Offline income**: the stands keep earning while you're away, up to 8 hours.
 - **Weather**: every 10 minutes, a random weather buffs the whole server for 3 minutes: Lucky Breeze (x2 luck), Shiny Storm (x2 variant chances), Golden Hour (x2 Cash), or the rare Brainrot Eclipse (all three).
@@ -51,7 +57,7 @@ To save progress between tests, turn on **Game Settings > Security > Enable Stud
 
 ## The brainrot models
 
-The 3D models come from the Creator Store (30 of the 36 cards have one, listed in `Config.ASSETS`). Cards without a model only show the card on their stand. Like in Speed Escape, the models have to be saved into the place once:
+The 3D models come from the Creator Store (30 of the 36 cards have one, listed in `Config.ASSETS`). Cards without a model only show the card on their stand. The plaza decoration (fountain, stalls, lamps, trees, benches, flowers) also comes from the Creator Store (`Config.DECOR`); a missing model is replaced by a simple shape. Like in Speed Escape, the models have to be saved into the place once (run it again after an update that adds models: it only adds the missing ones):
 
 1. Open the place in Studio (edit mode, not Play), with Rojo connected.
 2. Open **View > Command Bar**, paste the whole content of [`tools/import-assets.lua`](tools/import-assets.lua) and press Enter.

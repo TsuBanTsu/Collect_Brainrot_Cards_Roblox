@@ -1,4 +1,4 @@
--- Opening packs: rolls the rarity of each card with the pack's own odds (plus luck and
+-- Buying packs (they go to the backpack) and opening them: rolls the rarity of each card with the pack's own odds (plus luck and
 -- pity), picks the card, then rolls its variant (Holo, Rainbow, Gold or normal).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -70,17 +70,40 @@ local function rollCard(pack: Config.Pack, rarityId: string): string
 	return list[rng:NextInteger(1, #list)].id
 end
 
--- Returns the pulls, or nil and a reason
+-- Puts `count` packs in the backpack. Returns true, or false and a reason
+function Packs.buy(player: Player, packId: string, count: number): (boolean, string?)
+	local profile = PlayerData.get(player)
+	local pack = Config.PACK[packId]
+	if not profile or not pack then
+		return false, "Unknown pack"
+	end
+	if profile.Cash < pack.price * count then
+		return false, "Not enough Cash"
+	end
+	if not PlayerData.hasRoom(profile, count) then
+		return false, "Your backpack is full: sell some cards or get a bigger backpack"
+	end
+	profile.Cash -= pack.price * count
+	profile.Packs[packId] = (profile.Packs[packId] or 0) + count
+	PlayerData.sync(player)
+	return true
+end
+
+-- Opens a pack from the backpack. Returns the pulls, or nil and a reason
 function Packs.open(player: Player, packId: string): ({ Pull }?, string?)
 	local profile = PlayerData.get(player)
 	local pack = Config.PACK[packId]
 	if not profile or not pack then
 		return nil, "Unknown pack"
 	end
-	if profile.Cash < pack.price then
-		return nil, "Not enough Cash"
+	if (profile.Packs[packId] or 0) < 1 then
+		return nil, "You don't have this pack: buy it at the Shop"
 	end
-	profile.Cash -= pack.price
+	-- The pack frees its own slot, its cards take the others
+	if not PlayerData.hasRoom(profile, Config.CARDS_PER_PACK - 1) then
+		return nil, "Your backpack is full: sell some cards or get a bigger backpack"
+	end
+	PlayerData.removePack(profile, packId, 1)
 	profile.PacksOpened += 1
 
 	local buffs = Weather.buffs()

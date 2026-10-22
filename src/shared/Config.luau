@@ -217,15 +217,79 @@ function Config.oneIn(cardId: string, variantId: string): number
 end
 
 ---------------------------------------------------------------------------
--- Owned cards are stored as "cardId|variantId"
+-- Grading: a card can be graded once. It gets 4 scores from 1 to 10 and the
+-- average gives its grade, which multiplies its Cash and its sell price.
+-- The grade is rolled first with `chance` (percent, total 100), then 4 scores
+-- whose average fits that grade are made up, so the odds are exactly these.
+-- `min` is the lowest average of the grade (the average is rounded: 8.5 -> 9).
 ---------------------------------------------------------------------------
-function Config.cardKey(cardId: string, variantId: string): string
+export type Grade = { grade: number, name: string, min: number, chance: number, cash: number, color: Color3 }
+
+Config.GRADE_CRITERIA = { "Centering", "Corners", "Edges", "Surface" }
+
+Config.GRADES = {
+	{ grade = 10, name = "GEM MINT 10", min = 9.5, chance = 0.5, cash = 5, color = Color3.fromRGB(255, 215, 60) },
+	{ grade = 9, name = "MINT 9", min = 8.5, chance = 2, cash = 3, color = Color3.fromRGB(255, 120, 200) },
+	{ grade = 8, name = "NM-MT 8", min = 7.5, chance = 8, cash = 2, color = Color3.fromRGB(170, 110, 255) },
+	{ grade = 7, name = "NEAR MINT 7", min = 6.5, chance = 14.5, cash = 1.6, color = Color3.fromRGB(80, 170, 255) },
+	{ grade = 6, name = "EX-MT 6", min = 5.5, chance = 25, cash = 1.3, color = Color3.fromRGB(110, 220, 110) },
+	{ grade = 5, name = "EXCELLENT 5", min = 4.5, chance = 25, cash = 1.15, color = Color3.fromRGB(210, 210, 210) },
+	{ grade = 4, name = "POOR", min = 1, chance = 25, cash = 1, color = Color3.fromRGB(150, 150, 150) },
+} :: { Grade }
+
+-- Grading a card costs the price of its pack x its variant's Cash multiplier
+function Config.gradeCost(cardId: string, variantId: string): number
+	local card = Config.CARDS[cardId]
+	local variant = Config.VARIANT[variantId] or Config.NORMAL_VARIANT
+	return Config.PACK[card.pack].price * variant.cash
+end
+
+function Config.gradeFromScores(scores: { number }): Grade
+	local total = 0
+	for _, score in scores do
+		total += score
+	end
+	local average = total / #scores
+	for _, grade in Config.GRADES do
+		if average >= grade.min then
+			return grade
+		end
+	end
+	return Config.GRADES[#Config.GRADES]
+end
+
+---------------------------------------------------------------------------
+-- Owned cards are stored as "cardId|variantId", or "cardId|variantId|9.10.8.9"
+-- once graded (the 4 scores). Identical cards stack under the same key.
+---------------------------------------------------------------------------
+function Config.cardKey(cardId: string, variantId: string, scores: { number }?): string
+	if scores then
+		return cardId .. "|" .. variantId .. "|" .. table.concat(scores, ".")
+	end
 	return cardId .. "|" .. variantId
 end
 
-function Config.splitKey(key: string): (string, string)
-	local cardId, variantId = string.match(key, "^(.-)|(.+)$")
-	return cardId or key, variantId or "normal"
+-- Returns the card id, the variant id and the 4 scores (nil if the card isn't graded)
+function Config.splitKey(key: string): (string, string, { number }?)
+	local parts = string.split(key, "|")
+	if #parts < 2 then
+		return key, "normal", nil
+	end
+	local scores: { number }? = nil
+	if parts[3] then
+		local list = {}
+		for _, score in string.split(parts[3], ".") do
+			table.insert(list, tonumber(score) or 1)
+		end
+		scores = list
+	end
+	return parts[1], parts[2], scores
+end
+
+-- The grade of a card key, or nil if it isn't graded
+function Config.keyGrade(key: string): Grade?
+	local _, _, scores = Config.splitKey(key)
+	return if scores then Config.gradeFromScores(scores) else nil
 end
 
 -- Cash per second of a card on a stand, before player bonuses (Index, weather)
@@ -236,6 +300,48 @@ function Config.cardIncome(cardId: string, variantId: string): number
 	end
 	local variant = Config.VARIANT[variantId] or Config.NORMAL_VARIANT
 	return Config.RARITY[card.rarity].cash * Config.PACK[card.pack].cash * variant.cash
+end
+
+-- Same, for an owned card key (its grade included)
+function Config.keyIncome(key: string): number
+	local cardId, variantId = Config.splitKey(key)
+	local grade = Config.keyGrade(key)
+	return Config.cardIncome(cardId, variantId) * (if grade then grade.cash else 1)
+end
+
+---------------------------------------------------------------------------
+-- Backpack and selling
+---------------------------------------------------------------------------
+-- Cards and unopened packs take one slot each; cards on the stands don't count
+Config.BACKPACK_SLOTS = 50
+-- Bigger backpacks, bought one after the other at the Shop
+Config.BACKPACK_UPGRADES = {
+	{ slots = 25, price = 750 },
+	{ slots = 25, price = 7500 },
+	{ slots = 50, price = 75000 },
+	{ slots = 50, price = 750000 },
+	{ slots = 100, price = 10000000 },
+} :: { { slots: number, price: number } }
+
+function Config.backpackSize(level: number): number
+	local size = Config.BACKPACK_SLOTS
+	for index = 1, math.min(level, #Config.BACKPACK_UPGRADES) do
+		size += Config.BACKPACK_UPGRADES[index].slots
+	end
+	return size
+end
+
+-- A card sells for this many seconds of its Cash (grade included)
+Config.SELL_SECONDS = 60
+-- An unopened pack sells back for this share of its price
+Config.PACK_SELL_RATIO = 0.5
+
+function Config.sellPrice(key: string): number
+	return math.max(1, math.floor(Config.keyIncome(key) * Config.SELL_SECONDS))
+end
+
+function Config.packSellPrice(packId: string): number
+	return math.floor(Config.PACK[packId].price * Config.PACK_SELL_RATIO)
 end
 
 ---------------------------------------------------------------------------
@@ -327,6 +433,21 @@ Config.ASSETS = {
 	strawberry = { id = 14964355116 },
 	trictrac = { id = 97300319440209 },
 	blueberrinni = { id = 93308616326000 },
-} :: { [string]: { id: number, height: number?, yaw: number? } }
+} :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
+
+-- Free Creator Store models that decorate the plaza (same loading as the brainrots).
+-- If one is missing, a simple shape built from parts takes its place.
+-- `size` (instead of `height`) scales a flat model by its longest side.
+Config.DECOR = {
+	decor_fountain = { id = 11423259371, height = 9 },
+	decor_stall = { id = 15147571772, height = 11 },
+	decor_lamp = { id = 15472204631, height = 14 },
+	decor_tree = { id = 580221169, height = 22 },
+	decor_sakura = { id = 3725991689, height = 20 },
+	decor_bench = { id = 23153972, height = 3.5 },
+	decor_flowers = { id = 8344171779, height = 3 },
+	decor_register = { id = 3559550517, height = 2.2 },
+	decor_magnifier = { id = 11935186507, size = 3 },
+} :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
 
 return Config

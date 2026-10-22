@@ -1,4 +1,5 @@
--- The map: ground, spawn in the middle and one plot per player around it.
+-- The map: ground, spawn in the middle and one plot per player around it
+-- (the plaza in the middle is built by Plaza.luau).
 -- Each plot has Config.STAND_COUNT stands that show the cards the player placed on them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -67,12 +68,11 @@ end
 ---------------------------------------------------------------------------
 local function buildCenter()
 	part({ Name = "Ground", Size = Vector3.new(420, 2, 420), Position = Vector3.new(0, -1, 0), Color = Color3.fromRGB(95, 185, 95), Material = Enum.Material.Grass, Parent = mapFolder })
-	part({ Name = "Plaza", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1, 70, 70), CFrame = CFrame.new(0, 0.1, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(235, 225, 200), Material = Enum.Material.Concrete, Parent = mapFolder })
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Anchored = true
 	spawn.Size = Vector3.new(10, 1, 10)
-	spawn.Position = Vector3.new(0, 0.6, 0)
+	spawn.Position = Vector3.new(0, 0.6, 18) -- in front of the fountain (Plaza.luau)
 	spawn.Transparency = 1
 	spawn.CanCollide = false
 	spawn.Neutral = true
@@ -80,7 +80,7 @@ local function buildCenter()
 	spawn.Parent = mapFolder
 
 	-- Big floating title in the middle
-	local anchor = part({ Name = "Title", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 22, 0), Transparency = 1, CanCollide = false, CanQuery = false, Parent = mapFolder })
+	local anchor = part({ Name = "Title", Size = Vector3.new(1, 1, 1), Position = Vector3.new(0, 28, 0), Transparency = 1, CanCollide = false, CanQuery = false, Parent = mapFolder })
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.fromScale(40, 10)
 	billboard.LightInfluence = 0
@@ -139,6 +139,11 @@ local function buildPlot(index: number): Plot
 	end
 
 	return { index = index, cframe = cframe, model = model, owner = nil, stands = stands, sign = sign, income = income }
+end
+
+-- The folder that holds the map, for the other map builders
+function Plots.folder(): Folder
+	return mapFolder
 end
 
 function Plots.init()
