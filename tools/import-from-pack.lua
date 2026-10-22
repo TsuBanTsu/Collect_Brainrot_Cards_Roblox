@@ -88,7 +88,11 @@ for _, child in workspace:GetChildren() do
 end
 local normal
 for _, pack in packs do
-	normal = normal or pack:FindFirstChild("Normal")
+	-- A pack inserted twice and emptied by hand leaves an empty "Normal": take one with models
+	local folder = pack:FindFirstChild("Normal")
+	if folder and #folder:GetChildren() > 0 then
+		normal = folder
+	end
 end
 if not normal then
 	warn("[Pack] No BrainrotPack > Normal in Workspace: insert the pack from the Toolbox first.")

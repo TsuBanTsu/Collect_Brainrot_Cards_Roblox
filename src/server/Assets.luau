@@ -89,7 +89,9 @@ local function load(key: string, info)
 		model:Destroy()
 		return
 	end
-	-- Pivot at the bottom center of the model, facing -Z (turned by `yaw` if needed)
+	-- Pivot at the bottom center of the model, facing -Z (turned by `yaw` if needed).
+	-- WorldPivot is ignored while a PrimaryPart is set (the pack's ones are tipped over by 90°)
+	model.PrimaryPart = nil
 	model.WorldPivot = CFrame.new(model:GetPivot().Position) * CFrame.Angles(0, math.rad(info.yaw or 0), 0)
 	local box, size = model:GetBoundingBox()
 	model.WorldPivot = CFrame.new(box.Position - Vector3.new(0, size.Y / 2, 0)) * model.WorldPivot.Rotation
