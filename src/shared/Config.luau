@@ -71,6 +71,9 @@ Config.CARDS = {} :: { [string]: Card }
 -- Packs. Each pack has its own odds (percent per card, total 100):
 -- low rarities fade out and rarer ones appear as packs get more expensive.
 -- `cash` multiplies the income of the pack's cards so each new pack is worth it.
+-- Prices are set so that a player who plays actively reaches each pack in about:
+-- Italian 4 min, Chaos 40 min, Sky 2 h, Galaxy 6 h (tools/balance-sim.py, without offline
+-- income, towers, weather or Index bonus, which all speed it up a bit).
 -- Each pack lists its cards by rarity.
 ---------------------------------------------------------------------------
 export type Pack = {
@@ -106,7 +109,7 @@ Config.PACKS = {
 		id = "italian",
 		order = 2,
 		name = "Italian Pack",
-		price = 1000,
+		price = 40000,
 		cash = 8,
 		color = Color3.fromRGB(80, 170, 255),
 		odds = { common = 30, uncommon = 40, rare = 25, epic = 4.5, legendary = 0.5 },
@@ -122,7 +125,7 @@ Config.PACKS = {
 		id = "chaos",
 		order = 3,
 		name = "Chaos Pack",
-		price = 25000,
+		price = 2000000,
 		cash = 60,
 		color = Color3.fromRGB(255, 110, 70),
 		odds = { uncommon = 35, rare = 45, epic = 16, legendary = 3.5, mythic = 0.5 },
@@ -138,7 +141,7 @@ Config.PACKS = {
 		id = "sky",
 		order = 4,
 		name = "Sky Pack",
-		price = 500000,
+		price = 120000000,
 		cash = 500,
 		color = Color3.fromRGB(120, 220, 255),
 		odds = { rare = 50, epic = 35, legendary = 12, mythic = 2.8, secret = 0.2 },
@@ -154,7 +157,7 @@ Config.PACKS = {
 		id = "galaxy",
 		order = 5,
 		name = "Galaxy Pack",
-		price = 10000000,
+		price = 4000000000,
 		cash = 4000,
 		color = Color3.fromRGB(170, 90, 255),
 		odds = { epic = 55, legendary = 33, mythic = 10, secret = 1.9, divine = 0.1 },
@@ -237,11 +240,12 @@ Config.GRADES = {
 	{ grade = 4, name = "POOR", min = 1, chance = 25, cash = 1, color = Color3.fromRGB(150, 150, 150) },
 } :: { Grade }
 
--- Grading a card costs the price of its pack x its variant's Cash multiplier
+-- Grading a card costs GRADE_COST_SECONDS of its Cash (variant included). A grade adds about
+-- +34% on average, so it pays for itself after about 15 minutes on a stand.
+Config.GRADE_COST_SECONDS = 300
+
 function Config.gradeCost(cardId: string, variantId: string): number
-	local card = Config.CARDS[cardId]
-	local variant = Config.VARIANT[variantId] or Config.NORMAL_VARIANT
-	return Config.PACK[card.pack].price * variant.cash
+	return math.max(1, math.floor(Config.cardIncome(cardId, variantId) * Config.GRADE_COST_SECONDS))
 end
 
 function Config.gradeFromScores(scores: { number }): Grade
@@ -363,11 +367,11 @@ end
 Config.BACKPACK_SLOTS = 50
 -- Bigger backpacks, bought one after the other at the Shop
 Config.BACKPACK_UPGRADES = {
-	{ slots = 25, price = 750 },
-	{ slots = 25, price = 7500 },
-	{ slots = 50, price = 75000 },
-	{ slots = 50, price = 750000 },
-	{ slots = 100, price = 10000000 },
+	{ slots = 25, price = 2500 },
+	{ slots = 25, price = 100000 },
+	{ slots = 50, price = 3000000 },
+	{ slots = 50, price = 100000000 },
+	{ slots = 100, price = 3000000000 },
 } :: { { slots: number, price: number } }
 
 function Config.backpackSize(level: number): number
@@ -378,13 +382,42 @@ function Config.backpackSize(level: number): number
 	return size
 end
 
--- A card sells for this many seconds of its Cash (grade included)
-Config.SELL_SECONDS = 60
+-- A card sells for SELL_RATIO of its share of the pack price (price / CARDS_PER_PACK), scaled by how
+-- much more (or less) Cash it makes than an average card of its pack (variant, grade and trait
+-- included). On average, selling the cards of a pack gives back 25% of its price, so opening packs
+-- only to sell them loses money.
+Config.SELL_RATIO = 0.25
 -- An unopened pack sells back for this share of its price
 Config.PACK_SELL_RATIO = 0.5
 
+-- Average Cash per second of a normal-grade card pulled from a pack (variants included)
+local averageIncome: { [string]: number } = {}
+
+function Config.packAverageIncome(packId: string): number
+	if averageIncome[packId] then
+		return averageIncome[packId]
+	end
+	local pack = Config.PACK[packId]
+	local variantAverage = Config.variantChance("normal") / 100
+	for _, variant in Config.VARIANTS do
+		variantAverage += variant.chance / 100 * variant.cash
+	end
+	local rarityAverage = 0
+	for rarityId, odds in pack.odds do
+		rarityAverage += odds / 100 * Config.RARITY[rarityId].cash
+	end
+	averageIncome[packId] = rarityAverage * pack.cash * variantAverage
+	return averageIncome[packId]
+end
+
 function Config.sellPrice(key: string): number
-	return math.max(1, math.floor(Config.keyIncome(key) * Config.SELL_SECONDS))
+	local cardId = Config.splitKey(key)
+	local card = Config.CARDS[cardId]
+	if not card then
+		return 1
+	end
+	local share = Config.PACK[card.pack].price / Config.CARDS_PER_PACK * Config.SELL_RATIO
+	return math.max(1, math.floor(share * Config.keyIncome(key) / Config.packAverageIncome(card.pack)))
 end
 
 function Config.packSellPrice(packId: string): number

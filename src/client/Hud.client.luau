@@ -717,11 +717,11 @@ local function refreshCards()
 end
 
 ---------------------------------------------------------------------------
--- Sell (plaza station): cards for Config.SELL_SECONDS of their Cash, packs for part of their price
+-- Sell (plaza station): cards for a share of their pack price, packs for part of their price
 ---------------------------------------------------------------------------
 local SELL_COLOR = Color3.fromRGB(255, 190, 60)
 local sellPanel = makePanel("Sell", "SELL", SELL_COLOR, Vector2.new(760, 500))
-textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.new(1, -32, 0, 22), Text = string.format("Cards sell for %d seconds of their Cash. Cards on your stands can't be sold.", Config.SELL_SECONDS), TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = sellPanel })
+textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.new(1, -32, 0, 22), Text = "Rarer and shinier cards sell for more. Cards on your stands can't be sold.", TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = sellPanel })
 local sellList = scrollingList({ Position = UDim2.fromOffset(12, 92), Size = UDim2.new(1, -24, 1, -104), Parent = sellPanel })
 
 -- A row with "SELL 1" and "SELL ALL" buttons
