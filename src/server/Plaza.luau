@@ -286,6 +286,17 @@ end
 ---------------------------------------------------------------------------
 -- Stations
 ---------------------------------------------------------------------------
+-- A round stool: a seat in the station's color on 4 wooden legs, `height` studs tall
+local function buildStool(parent: Instance, base: CFrame, height: number, diameter: number, color: Color3)
+	local seat = 0.5
+	part({ Name = "StoolSeat", Shape = Enum.PartType.Cylinder, Size = Vector3.new(seat, diameter, diameter), CFrame = base * CFrame.new(0, height - seat / 2, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = color, Material = Enum.Material.SmoothPlastic, Parent = parent })
+	for i = 0, 3 do
+		local angle = math.rad(i * 90 + 45)
+		local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * (diameter / 2 - 0.45)
+		part({ Name = "StoolLeg", Size = Vector3.new(0.4, height - seat, 0.4), CFrame = base * CFrame.new(offset + Vector3.new(0, (height - seat) / 2, 0)), Color = Color3.fromRGB(150, 100, 60), Material = Enum.Material.SmoothPlastic, Parent = parent })
+	end
+end
+
 local function buildStation(station: Station)
 	local angle = math.rad(station.angle)
 	local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
@@ -349,11 +360,11 @@ local function buildStation(station: Station)
 			keeperModel:ScaleTo(keeperModel:GetScale() * fit)
 			size = keeperModel:GetExtentsSize()
 		end
-		-- A shrunk brainrot stands on a podium, so it still shows well above the counter
+		-- A shrunk brainrot stands on a little stool, so it still shows well above the counter
 		local feet = math.max(FLOOR + 0.6, COUNTER_TOP + KEEPER_SHOWN - size.Y)
 		local z = 1.6 + size.Z / 2
 		if feet > FLOOR + 0.6 then
-			part({ Name = "KeeperPodium", Size = Vector3.new(math.min(size.X + 1, 12), feet - FLOOR - 0.6, size.Z + 0.6), CFrame = cframe * CFrame.new(0, (feet + FLOOR + 0.6) / 2, z), Color = station.color, Material = Enum.Material.SmoothPlastic, Parent = model })
+			buildStool(model, cframe * CFrame.new(0, FLOOR + 0.6, z), feet - FLOOR - 0.6, math.clamp(math.min(size.X, size.Z) + 0.6, 2.5, 4.4), station.color)
 		end
 		keeperModel:PivotTo(CFrame.new((cframe * CFrame.new(0, feet, z)).Position) * CFrame.Angles(0, yaw, 0))
 		keeperModel.Name = "Shopkeeper"
