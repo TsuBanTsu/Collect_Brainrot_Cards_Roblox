@@ -118,8 +118,11 @@ local function picture(window: Frame, parent: Instance, card: Config.Card, z: nu
 	if art then
 		new("ImageLabel", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Image = "rbxassetid://" .. art, ScaleType = Enum.ScaleType.Crop, ZIndex = z }, window)
 	-- ViewportFrames stay blank in the stands' SurfaceGuis: there, the 3D model stands right behind
-	-- the card, so the window shows the initial. The old thumbnail is only for models that aren't loaded.
-	elseif model and not parent:IsA("SurfaceGui") then
+	-- the card, so the window stays empty and the name moves into it (see CardArt.build).
+	-- The old thumbnail is only for models that aren't loaded.
+	elseif parent:IsA("SurfaceGui") then
+		return
+	elseif model then
 		viewport(window, model, z, zoom)
 	elseif not model and image ~= "" then
 		-- Thumbnails leave a lot of empty space around the model: zoomed in (the window clips it)
@@ -216,7 +219,14 @@ function CardArt.build(parent: Instance, cardId: string, variantId: string, grad
 
 	-- Rarity at the top, name and Cash at the bottom
 	text(inner, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.025), Size = UDim2.fromScale(0.9, 0.085), Text = string.upper(rarity.name), TextColor3 = rarity.color, ZIndex = z + 6 })
-	text(inner, { Position = UDim2.fromScale(0.06, if fullArt then 0.72 else 0.7), Size = UDim2.fromScale(0.88, 0.15), Text = card.name, TextWrapped = true, ZIndex = z + 6 })
+	local onStand = parent:IsA("SurfaceGui") and not Config.CARD_ART[cardId]
+	text(inner, {
+		Position = if onStand then UDim2.fromScale(0.08, 0.25) elseif fullArt then UDim2.fromScale(0.06, 0.72) else UDim2.fromScale(0.06, 0.7),
+		Size = if onStand then UDim2.fromScale(0.84, 0.32) else UDim2.fromScale(0.88, 0.15),
+		Text = card.name,
+		TextWrapped = true,
+		ZIndex = z + 6,
+	})
 	text(inner, { Position = UDim2.fromScale(0.15, 0.87), Size = UDim2.fromScale(0.7, 0.09), Text = "$" .. Format.number(Config.cardIncome(cardId, variantId)) .. "/s", TextColor3 = Color3.fromRGB(255, 225, 60), ZIndex = z + 6 })
 
 	-- Badges: the trait top left, the variant top right

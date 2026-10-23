@@ -289,9 +289,9 @@ local function showCard(stand: Stand, key: string)
 	-- Floating info, like the big brainrot games: name, rarity in its color, Cash per second.
 	-- Sized in studs: it gets smaller with distance, so the 8 labels of a plot don't pile up
 	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.fromScale(9, 3.6)
+	billboard.Size = UDim2.fromScale(7, 2.8)
 	billboard.StudsOffsetWorldSpace = Vector3.new(0, Config.MODEL_HEIGHT + 4 + stand.lift, 0)
-	billboard.MaxDistance = 60
+	billboard.MaxDistance = 40
 	billboard.LightInfluence = 0
 	billboard.Adornee = stand.base
 	billboard.Parent = stand.display
