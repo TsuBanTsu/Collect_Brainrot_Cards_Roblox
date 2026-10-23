@@ -147,6 +147,10 @@ local function buildPlot(index: number): Plot
 	-- Bushes in the back corners, flowers at the front
 	for _, side in { -1, 1 } do
 		for i, size in { 5, 3.6 } do
+			local bushPosition = (cframe * CFrame.new(side * (PLOT_WIDTH / 2 - 2.5 - (i - 1) * 3.4), 0.6, PLOT_DEPTH / 2 - 2.5 - (i - 1) * 1.5)).Position
+			if Assets.place("decor_bush", model, bushPosition, side * i, size) then
+				continue
+			end
 			part({
 				Name = "Bush",
 				Shape = Enum.PartType.Ball,

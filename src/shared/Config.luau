@@ -1099,13 +1099,25 @@ end
 -- The giant statue in the middle of the plaza: one of the card models (Config.ASSETS)
 Config.CENTER_STATUE = { card = "strawberry", height = 14 }
 
+-- The brainrot standing behind the counter of each station of the plaza (a card id, so its
+-- model comes from Config.ASSETS / the AssetLibrary) and how tall it is in studs
+Config.SHOPKEEPERS = {
+	shop = { card = "tralalero", title = "Shopkeeper", height = 6.5 },
+	sell = { card = "bobritobandito", title = "Buyer", height = 6.5 },
+	grade = { card = "noomyexamen", title = "Grader", height = 6.5 },
+	towers = { card = "bombardiro", title = "Tower Master", height = 6.5 },
+}
+
 -- Free Creator Store models that decorate the plaza (same loading as the brainrots).
 -- If one is missing, a simple shape built from parts takes its place.
 -- `size` (instead of `height`) scales a flat model by its longest side.
 Config.DECOR = {
-	decor_stall = { id = 15147571772, height = 11 },
-	decor_lamp = { id = 15472204631, height = 14 },
-	decor_tree = { id = 580221169, height = 22 },
+	-- Keys are never reused for another model: the place keeps old ones in ServerStorage.AssetLibrary
+	decor_cartoon_tree = { id = 13870570014, height = 20 },
+	decor_bush = { id = 11209863116, height = 4 },
+	decor_big_flowers = { id = 12209067059, height = 2.5 },
+	decor_rocks = { id = 8647358410, height = 3.5 },
+	decor_chest = { id = 7924041336, height = 2.6 },
 	decor_sakura = { id = 3725991689, height = 20 },
 	decor_bench = { id = 23153972, height = 3.5 },
 	decor_flowers = { id = 8344171779, height = 3 },
