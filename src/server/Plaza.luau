@@ -20,6 +20,9 @@ local PLOT_INNER = 59 -- where the plots start (PLOT_RADIUS - PLOT_DEPTH / 2 in 
 local USE_DISTANCE = 18 -- how close a player must be to use a station
 local FLOOR = 0.6 -- height of the plaza's floor
 local FONT = Enum.Font.FredokaOne
+local COUNTER_TOP = FLOOR + 3.9 -- top of the booths' counters
+local KEEPER_DEPTH = 4.4 -- room for the shopkeeper between the counter and the back of the booth
+local KEEPER_SHOWN = 3.5 -- how much of the shopkeeper shows above the counter, at least
 
 export type Station = { id: string, name: string, color: Color3, angle: number, prop: string?, prompt: string }
 
@@ -129,8 +132,8 @@ local function buildFloatingCards()
 			label(inner, { Position = UDim2.fromScale(0.1, 0.18), Size = UDim2.fromScale(0.8, 0.45), Text = "?", TextColor3 = color })
 			label(inner, { Position = UDim2.fromScale(0.08, 0.68), Size = UDim2.fromScale(0.84, 0.16), Text = "BRAINROT", TextColor3 = Color3.new(1, 1, 1) })
 		end
-		card:SetAttribute("Radius", 13)
-		card:SetAttribute("Height", FLOOR + 11)
+		card:SetAttribute("Radius", 17)
+		card:SetAttribute("Height", FLOOR + 13)
 		card:SetAttribute("Phase", (i - 1) / count * math.pi * 2)
 		card:SetAttribute("Speed", 0.35)
 		CollectionService:AddTag(card, "AmbientOrbit")
@@ -283,6 +286,22 @@ end
 ---------------------------------------------------------------------------
 -- Stations
 ---------------------------------------------------------------------------
+-- A stool `height` studs tall: the Creator Store bar stool, or else a seat in the station's
+-- color on 4 wooden legs
+local function buildStool(parent: Instance, base: CFrame, height: number, diameter: number, color: Color3)
+	local _, yaw = base:ToOrientation()
+	if Assets.place("decor_stool", parent, base.Position, yaw, height) then
+		return
+	end
+	local seat = 0.5
+	part({ Name = "StoolSeat", Shape = Enum.PartType.Cylinder, Size = Vector3.new(seat, diameter, diameter), CFrame = base * CFrame.new(0, height - seat / 2, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = color, Material = Enum.Material.SmoothPlastic, Parent = parent })
+	for i = 0, 3 do
+		local angle = math.rad(i * 90 + 45)
+		local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * (diameter / 2 - 0.45)
+		part({ Name = "StoolLeg", Size = Vector3.new(0.4, height - seat, 0.4), CFrame = base * CFrame.new(offset + Vector3.new(0, (height - seat) / 2, 0)), Color = Color3.fromRGB(150, 100, 60), Material = Enum.Material.SmoothPlastic, Parent = parent })
+	end
+end
+
 local function buildStation(station: Station)
 	local angle = math.rad(station.angle)
 	local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
@@ -341,30 +360,38 @@ local function buildStation(station: Station)
 	if keeperModel then
 		-- Shrunk if it's too wide or too deep for the booth (some brainrots are planes or sharks)
 		local size = keeperModel:GetExtentsSize()
-		local fit = math.min(1, 11 / size.X, 5 / size.Z)
+		local fit = math.min(1, 12 / size.X, KEEPER_DEPTH / size.Z)
 		if fit < 1 then
 			keeperModel:ScaleTo(keeperModel:GetScale() * fit)
+			size = keeperModel:GetExtentsSize()
 		end
-		keeperModel:PivotTo(CFrame.new((cframe * CFrame.new(0, FLOOR + 0.6, 3.2)).Position) * CFrame.Angles(0, yaw, 0))
+		-- A shrunk brainrot stands on a little stool, so it still shows well above the counter
+		local feet = math.max(FLOOR + 0.6, COUNTER_TOP + KEEPER_SHOWN - size.Y)
+		if feet < FLOOR + 1.6 then
+			feet = FLOOR + 0.6 -- almost tall enough: a stool this low would only look odd
+		end
+		local z = 1.6 + size.Z / 2
+		if feet > FLOOR + 0.6 then
+			buildStool(model, cframe * CFrame.new(0, FLOOR + 0.6, z), feet - FLOOR - 0.6, math.clamp(math.min(size.X, size.Z) + 0.6, 2.5, 4.4), station.color)
+		end
+		keeperModel:PivotTo(CFrame.new((cframe * CFrame.new(0, feet, z)).Position) * CFrame.Angles(0, yaw, 0))
 		keeperModel.Name = "Shopkeeper"
 		keeperModel.Parent = model
 		CollectionService:AddTag(keeperModel, "AmbientKeeper")
 		local card = Config.CARDS[keeper.card]
-		local anchor = part({ Name = "KeeperTag", Size = Vector3.new(1, 1, 1), CFrame = cframe * CFrame.new(0, FLOOR + 0.6 + keeperModel:GetExtentsSize().Y + 1.6, 3.2), Transparency = 1, CanCollide = false, CanQuery = false, Parent = model })
+		local anchor = part({ Name = "KeeperTag", Size = Vector3.new(1, 1, 1), CFrame = cframe * CFrame.new(0, math.min(feet + size.Y + 1.4, FLOOR + 9.4), z), Transparency = 1, CanCollide = false, CanQuery = false, Parent = model })
 		local tag = Instance.new("BillboardGui")
 		tag.Size = UDim2.fromScale(8, 2)
 		tag.LightInfluence = 0
-		tag.MaxDistance = 60
+		tag.MaxDistance = 45
+		tag.AlwaysOnTop = true -- the awning would hide it when the camera looks down
 		tag.Parent = anchor
 		label(tag, { Size = UDim2.fromScale(1, 0.55), Text = if card then card.name else keeper.card })
 		label(tag, { Position = UDim2.fromScale(0, 0.55), Size = UDim2.fromScale(1, 0.45), Text = keeper.title, TextColor3 = station.color })
 	end
 
-	-- Sign on top of the booth, readable from the plaza
-	local board = part({ Name = "Sign", Size = Vector3.new(14, 3.6, 0.8), CFrame = cframe * CFrame.new(0, FLOOR + 15.4, 6.4), Color = Color3.fromRGB(40, 35, 55), Parent = model })
-	for _, x in { -5, 5 } do
-		part({ Name = "SignPost", Size = Vector3.new(0.8, 3, 0.8), CFrame = cframe * CFrame.new(x, FLOOR + 12.6, 6.7), Color = white, Material = Enum.Material.SmoothPlastic, Parent = model })
-	end
+	-- Standing on the front edge of the awning, so nothing hides it
+	local board = part({ Name = "Sign", Size = Vector3.new(14, 3.6, 0.8), CFrame = cframe * CFrame.new(0, FLOOR + 13.2, -2.9), Color = Color3.fromRGB(40, 35, 55), Parent = model })
 	part({ Name = "SignFrame", Size = Vector3.new(14.8, 4.4, 0.6), CFrame = board.CFrame * CFrame.new(0, 0, 0.3), Color = white, Material = Enum.Material.SmoothPlastic, Parent = model })
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Front

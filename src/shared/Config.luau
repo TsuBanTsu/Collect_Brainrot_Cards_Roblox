@@ -1104,7 +1104,7 @@ Config.CENTER_STATUE = { card = "strawberry", height = 14 }
 Config.SHOPKEEPERS = {
 	shop = { card = "tralalero", title = "Shopkeeper", height = 6.5 },
 	sell = { card = "bobritobandito", title = "Buyer", height = 6.5 },
-	grade = { card = "noomyexamen", title = "Grader", height = 6.5 },
+	grade = { card = "odin", title = "Grader", height = 6.5 },
 	towers = { card = "bombardiro", title = "Tower Master", height = 6.5 },
 }
 
@@ -1117,7 +1117,8 @@ Config.DECOR = {
 	decor_bush = { id = 11209863116, height = 4 },
 	decor_big_flowers = { id = 12209067059, height = 2.5 },
 	decor_rocks = { id = 8647358410, height = 3.5 },
-	decor_chest = { id = 7924041336, height = 2.6 },
+	decor_chest = { id = 7924041336, height = 1.8 },
+	decor_stool = { id = 4456279344, height = 3 }, -- chosen by Estéban; scaled to the height needed
 	decor_sakura = { id = 3725991689, height = 20 },
 	decor_bench = { id = 23153972, height = 3.5 },
 	decor_flowers = { id = 8344171779, height = 3 },

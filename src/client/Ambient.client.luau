@@ -46,7 +46,7 @@ RunService.RenderStepped:Connect(function(dt)
 		local angle = (instance:GetAttribute("Phase") or 0) + t * (instance:GetAttribute("Speed") or 0.3)
 		local position = Vector3.new(math.cos(angle) * radius, height + math.sin(t * 1.5 + angle * 2) * 0.6, math.sin(angle) * radius)
 		-- Faces outward and rocks a little, like a card floating in the air
-		instance:PivotTo(CFrame.lookAt(position, position * 2 - Vector3.new(0, position.Y, 0)) * CFrame.Angles(0, math.sin(t + angle) * 0.4, math.sin(t * 0.8 + angle) * 0.08))
+		instance:PivotTo(CFrame.lookAt(position, position * 2 - Vector3.new(0, position.Y, 0)) * CFrame.Angles(0, math.sin(t + angle) * 0.25, math.sin(t * 0.8 + angle) * 0.08))
 	end
 
 	local character = player.Character
