@@ -275,8 +275,8 @@ end)
 
 local weatherLabel = textLabel({
 	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 114),
-	Size = UDim2.fromOffset(520, 26),
+	Position = UDim2.new(0.5, 0, 0, 118),
+	Size = UDim2.fromOffset(520, 22),
 	Text = "",
 	Parent = root,
 })
@@ -920,7 +920,7 @@ local indexGrid = create("ScrollingFrame", {
 	AutomaticCanvasSize = Enum.AutomaticSize.Y,
 	ScrollBarThickness = 6,
 	Parent = indexPanel,
-}, { create("UIGridLayout", { CellSize = UDim2.fromOffset(150, 210), CellPadding = UDim2.fromOffset(18, 14), SortOrder = Enum.SortOrder.LayoutOrder }) })
+}, { create("UIGridLayout", { CellSize = UDim2.fromOffset(150, 210), CellPadding = UDim2.fromOffset(18, 34), SortOrder = Enum.SortOrder.LayoutOrder }) })
 
 local indexPack = "starter"
 local tabButtons: { [string]: TextButton } = {}
@@ -946,16 +946,21 @@ local function refreshIndex()
 		if profile.index[card.id] then
 			local frame = cardFrame(indexGrid, card.id, "normal", UDim2.fromOffset(150, 210))
 			frame.LayoutOrder = order
-			textLabel({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -4), Size = UDim2.new(0.9, 0, 0, 20), Text = "1/" .. Format.number(Config.oneIn(card.id, "normal")), ZIndex = 10, Parent = frame })
+			textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 2), Size = UDim2.new(0.9, 0, 0, 20), Text = "1/" .. Format.number(Config.oneIn(card.id, "normal")), ZIndex = 10, Parent = frame })
 		else
 			local rarity = Config.RARITY[card.rarity]
-			create("Frame", { LayoutOrder = order, BackgroundColor3 = DARK, Parent = indexGrid }, {
-				corner(14),
-				stroke(3, rarity.color:Lerp(DARK, 0.5)),
-				textLabel({ Position = UDim2.fromScale(0.06, 0.05), Size = UDim2.fromScale(0.88, 0.1), Text = rarity.name, TextColor3 = rarity.color }),
-				textLabel({ Position = UDim2.fromScale(0.2, 0.3), Size = UDim2.fromScale(0.6, 0.3), Text = "?", TextColor3 = GREY }),
-				textLabel({ Position = UDim2.fromScale(0.06, 0.8), Size = UDim2.fromScale(0.88, 0.12), Text = "1/" .. Format.number(Config.oneIn(card.id, "normal")), TextColor3 = GREY }),
+			-- Not found yet: the card's back, with a border dimmed in its rarity's color
+			local back = create("Frame", { LayoutOrder = order, BackgroundColor3 = rarity.color:Lerp(DARK, 0.55), Parent = indexGrid }, {
+				create("UICorner", { CornerRadius = UDim.new(0.07, 0) }),
+				stroke(2),
 			})
+			create("Frame", { Position = UDim2.fromScale(0.06, 0.045), Size = UDim2.fromScale(0.88, 0.91), BackgroundColor3 = Color3.fromRGB(35, 30, 55), Parent = back }, {
+				create("UICorner", { CornerRadius = UDim.new(0.07, 0) }),
+				stroke(2.5, Color3.new(1, 1, 1)),
+				textLabel({ Position = UDim2.fromScale(0.05, 0.025), Size = UDim2.fromScale(0.9, 0.085), Text = string.upper(rarity.name), TextColor3 = rarity.color }),
+				textLabel({ Position = UDim2.fromScale(0.2, 0.28), Size = UDim2.fromScale(0.6, 0.35), Text = "?", TextColor3 = rarity.color:Lerp(DARK, 0.3) }),
+			})
+			textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 2), Size = UDim2.new(0.9, 0, 0, 20), Text = "1/" .. Format.number(Config.oneIn(card.id, "normal")), TextColor3 = GREY, Parent = back })
 		end
 	end
 end

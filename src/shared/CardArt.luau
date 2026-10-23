@@ -129,15 +129,15 @@ local function picture(window: Frame, parent: Instance, card: Config.Card, z: nu
 	end
 end
 
--- A small rounded badge in a corner of the card
+-- A rounded tab sticking out over a top corner of the card, so it never hides the rarity
 local function badge(parent: Instance, anchorX: number, label: string, color: Color3, colors: ColorSequence?, z: number)
-	local frame = new("Frame", { AnchorPoint = Vector2.new(anchorX, 0), Position = UDim2.fromScale(if anchorX == 0 then 0.03 else 0.97, 0.025), Size = UDim2.fromScale(0.3, 0.085), BackgroundColor3 = if colors then WHITE else color, ZIndex = z }, parent)
+	local frame = new("Frame", { AnchorPoint = Vector2.new(anchorX, 0.5), Position = UDim2.fromScale(if anchorX == 0 then -0.04 else 1.04, 0.015), Size = UDim2.fromScale(0.42, 0.095), Rotation = if anchorX == 0 then -8 else 8, BackgroundColor3 = if colors then WHITE else color, ZIndex = z }, parent)
 	new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, frame)
 	new("UIStroke", { Thickness = 2, Color = DARK, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, frame)
 	if colors then
 		new("UIGradient", { Rotation = 20, Color = colors }, frame)
 	end
-	text(frame, { Position = UDim2.fromScale(0.08, 0.12), Size = UDim2.fromScale(0.84, 0.76), Text = label, ZIndex = z + 1 })
+	text(frame, { Position = UDim2.fromScale(0.08, 0.1), Size = UDim2.fromScale(0.84, 0.8), Text = label, ZIndex = z + 1 })
 end
 
 local TRAIT_LABELS = { dmg = "DMG", hp = "HP", coin = "$$$" }
@@ -158,10 +158,10 @@ function CardArt.build(parent: Instance, cardId: string, variantId: string, grad
 		root = new("Frame", { Name = "Sleeve", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(220, 235, 255), BackgroundTransparency = 0.55, ZIndex = z }, parent)
 		new("UICorner", { CornerRadius = UDim.new(0.05, 0) }, root)
 		new("UIStroke", { Thickness = 3, Color = WHITE, Transparency = 0.1 }, root)
-		local label = new("Frame", { Position = UDim2.fromScale(0.05, 0.02), Size = UDim2.fromScale(0.9, 0.11), BackgroundColor3 = WHITE, ZIndex = z + 1 }, root)
+		local label = new("Frame", { Position = UDim2.fromScale(0.05, 0.02), Size = UDim2.fromScale(0.9, 0.11), BackgroundColor3 = DARK, ZIndex = z + 1 }, root)
 		new("UICorner", { CornerRadius = UDim.new(0.2, 0) }, label)
 		new("UIStroke", { Thickness = 3, Color = grade.color }, label)
-		text(label, { Position = UDim2.fromScale(0.04, 0.12), Size = UDim2.fromScale(0.66, 0.76), Text = grade.name, TextColor3 = DARK, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = z + 2 })
+		text(label, { Position = UDim2.fromScale(0.04, 0.12), Size = UDim2.fromScale(0.66, 0.76), Text = grade.name, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = z + 2 })
 		text(label, { Position = UDim2.fromScale(0.72, 0.02), Size = UDim2.fromScale(0.25, 0.96), Text = tostring(grade.grade), TextColor3 = grade.color, ZIndex = z + 2 })
 		holder = new("Frame", { Position = UDim2.fromScale(0.06, 0.155), Size = UDim2.fromScale(0.88, 0.825), BackgroundTransparency = 1, ZIndex = z }, root)
 		z += 2
@@ -202,31 +202,31 @@ function CardArt.build(parent: Instance, cardId: string, variantId: string, grad
 
 	-- Variants: a colored reflection over the picture
 	if variantId ~= "normal" then
-		local foil = new("Frame", { Name = "Foil", Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BackgroundTransparency = if variantId == "gold" then 0.72 else 0.62, ZIndex = z + 4 }, inner)
-		new("UIGradient", { Rotation = 35, Color = CardArt.frameColors(cardId, variantId), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(0.5, 0.8), NumberSequenceKeypoint.new(1, 0.2) }) }, foil)
+		local foil = new("Frame", { Name = "Foil", Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BackgroundTransparency = if variantId == "gold" then 0.45 else 0.4, ZIndex = z + 4 }, inner)
+		new("UIGradient", { Rotation = 35, Color = CardArt.frameColors(cardId, variantId), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.5, 0.75), NumberSequenceKeypoint.new(1, 0) }) }, foil)
 	end
 
 	-- Full arts: dark fades behind the texts so they stay readable over the picture
 	if fullArt then
 		for _, top in { true, false } do
-			local fade = new("Frame", { Position = UDim2.fromScale(0, if top then 0 else 0.62), Size = UDim2.fromScale(1, if top then 0.2 else 0.38), BackgroundColor3 = DARK, BorderSizePixel = 0, ZIndex = z + 5 }, inner)
-			new("UIGradient", { Rotation = if top then 90 else -90, Transparency = NumberSequence.new(0.15, 1) }, fade)
+			local fade = new("Frame", { Position = UDim2.fromScale(0, if top then 0 else 0.55), Size = UDim2.fromScale(1, if top then 0.2 else 0.45), BackgroundColor3 = DARK, BorderSizePixel = 0, ZIndex = z + 5 }, inner)
+			new("UIGradient", { Rotation = if top then 90 else -90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.6, 0.15), NumberSequenceKeypoint.new(1, 1) }) }, fade)
 		end
 	end
 
 	-- Rarity at the top, name and Cash at the bottom
-	text(inner, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.02), Size = UDim2.fromScale(0.4, 0.09), Text = string.upper(rarity.name), TextColor3 = rarity.color, ZIndex = z + 6 })
+	text(inner, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.025), Size = UDim2.fromScale(0.9, 0.085), Text = string.upper(rarity.name), TextColor3 = rarity.color, ZIndex = z + 6 })
 	text(inner, { Position = UDim2.fromScale(0.06, if fullArt then 0.72 else 0.7), Size = UDim2.fromScale(0.88, 0.15), Text = card.name, TextWrapped = true, ZIndex = z + 6 })
 	text(inner, { Position = UDim2.fromScale(0.15, 0.87), Size = UDim2.fromScale(0.7, 0.09), Text = "$" .. Format.number(Config.cardIncome(cardId, variantId)) .. "/s", TextColor3 = Color3.fromRGB(255, 225, 60), ZIndex = z + 6 })
 
 	-- Badges: the trait top left, the variant top right
 	local trait = traitId and Config.TRAIT[traitId]
 	if trait then
-		badge(inner, 0, TRAIT_LABELS[trait.id] or string.upper(trait.name), trait.color, nil, z + 7)
+		badge(frame, 0, TRAIT_LABELS[trait.id] or string.upper(trait.name), trait.color, nil, z + 7)
 	end
 	if variantId ~= "normal" then
 		local variant = Config.VARIANT[variantId]
-		badge(inner, 1, string.upper(variant.name), variant.color, CardArt.frameColors(cardId, variantId), z + 7)
+		badge(frame, 1, string.upper(variant.name), variant.color, CardArt.frameColors(cardId, variantId), z + 7)
 	end
 
 	-- Light streak for shiny cards and full arts
