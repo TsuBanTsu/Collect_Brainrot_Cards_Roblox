@@ -295,7 +295,7 @@ local function showCard(stand: Stand, key: string)
 	local suffix = if grade then " [" .. grade.grade .. "]" else ""
 	label(billboard, { Size = UDim2.fromScale(1, 0.36), Text = prefix .. card.name .. suffix })
 	local rarityLabel = label(billboard, { Position = UDim2.fromScale(0, 0.36), Size = UDim2.fromScale(1, 0.3), Text = string.upper(rarity.name), TextColor3 = rarity.color })
-	if card.rarity == "secret" or card.rarity == "divine" then
+	if rarity.order >= Config.RARITY.secret.order then
 		-- The top rarities get a rainbow name
 		rarityLabel.TextColor3 = Color3.new(1, 1, 1)
 		local gradient = Instance.new("UIGradient")

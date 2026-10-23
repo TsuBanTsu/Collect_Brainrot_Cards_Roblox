@@ -38,7 +38,7 @@ local function defaultProfile()
 		Packs = {}, -- [packId] = unopened packs in the backpack
 		BackpackLevel = 0, -- number of backpack upgrades bought
 		Index = {}, -- [cardId] = true once pulled at least once
-		Pity = {}, -- [packId] = packs opened since the last card of Config.PITY_RARITY or better
+		Pity = {}, -- [packId] = packs opened since the last card of Config.pityRarity or better
 		LastOnline = 0, -- os.time() of the last save, for offline income
 		DailyDay = 0, -- day number of the last daily reward claimed
 		DailyStreak = 0,

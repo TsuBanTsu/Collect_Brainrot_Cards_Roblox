@@ -313,7 +313,7 @@ remotes.Fuse.OnServerEvent:Connect(function(player, key: any)
 end)
 
 ---------------------------------------------------------------------------
--- Selling (at the plaza): cards for Config.SELL_SECONDS of their Cash, packs for part of their price
+-- Selling (at the plaza): cards for a share of their pack price, packs for part of their price
 ---------------------------------------------------------------------------
 remotes.SellCard.OnServerEvent:Connect(function(player, key: any, count: any)
 	local profile = PlayerData.get(player)

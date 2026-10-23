@@ -432,13 +432,9 @@ local function oddsText(pack: Config.Pack): string
 end
 
 local function pityText(pack: Config.Pack): string
-	for rarityId in pack.odds do
-		if Config.RARITY[rarityId].order < Config.RARITY[Config.PITY_RARITY].order then
-			local left = Config.PITY_PACKS - (profile.pity[pack.id] or 0)
-			return string.format("%s or better guaranteed in %d pack%s", Config.RARITY[Config.PITY_RARITY].name, left, if left > 1 then "s" else "")
-		end
-	end
-	return ""
+	local rarity = Config.pityRarity(pack.id)
+	local left = Config.PITY_PACKS - (profile.pity[pack.id] or 0)
+	return string.format("%s or better guaranteed in %d pack%s", rarity.name, left, if left > 1 then "s" else "")
 end
 
 -- A pack row with its name, odds and a line under them; buttons are added by the caller
@@ -475,7 +471,7 @@ local SHOP_COLOR = Color3.fromRGB(90, 200, 120)
 local shopPanel = makePanel("Shop", "PACK SHOP", SHOP_COLOR, Vector2.new(760, 500))
 local shopList = scrollingList({ Position = UDim2.fromOffset(14, 64), Size = UDim2.new(1, -28, 1, -76), Parent = shopPanel }, 8)
 local buyButtons: { { button: TextButton, price: number } } = {}
-local upgradeRow = create("Frame", { LayoutOrder = 100, Size = UDim2.new(1, -10, 0, 70), BackgroundColor3 = Color3.new(1, 1, 1), Parent = shopList }, { corner(12), stroke(2), gradient(Color3.fromRGB(70, 110, 170), Color3.fromRGB(35, 50, 80)) })
+local upgradeRow = create("Frame", { LayoutOrder = 0, Size = UDim2.new(1, -10, 0, 70), BackgroundColor3 = Color3.new(1, 1, 1), Parent = shopList }, { corner(12), stroke(2), gradient(Color3.fromRGB(70, 110, 170), Color3.fromRGB(35, 50, 80)) })
 local upgradeText = textLabel({ Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -230, 0, 54), Text = "", TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, Parent = upgradeRow })
 local upgradeButton = button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(190, 52), Text = "UPGRADE", BackgroundColor3 = ACCENT }, function()
 	remotes.UpgradeBackpack:FireServer()
@@ -717,11 +713,11 @@ local function refreshCards()
 end
 
 ---------------------------------------------------------------------------
--- Sell (plaza station): cards for Config.SELL_SECONDS of their Cash, packs for part of their price
+-- Sell (plaza station): cards for a share of their pack price, packs for part of their price
 ---------------------------------------------------------------------------
 local SELL_COLOR = Color3.fromRGB(255, 190, 60)
 local sellPanel = makePanel("Sell", "SELL", SELL_COLOR, Vector2.new(760, 500))
-textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.new(1, -32, 0, 22), Text = string.format("Cards sell for %d seconds of their Cash. Cards on your stands can't be sold.", Config.SELL_SECONDS), TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = sellPanel })
+textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.new(1, -32, 0, 22), Text = "Rarer and shinier cards sell for more. Cards on your stands can't be sold.", TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = sellPanel })
 local sellList = scrollingList({ Position = UDim2.fromOffset(12, 92), Size = UDim2.new(1, -24, 1, -104), Parent = sellPanel })
 
 -- A row with "SELL 1" and "SELL ALL" buttons
@@ -891,12 +887,23 @@ end
 local INDEX_COLOR = Color3.fromRGB(170, 90, 230)
 local indexPanel = makePanel("Index", "INDEX", INDEX_COLOR, Vector2.new(900, 500))
 local indexBonus = textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.fromOffset(560, 26), Text = "", TextColor3 = CASH_COLOR, TextXAlignment = Enum.TextXAlignment.Left, Parent = indexPanel })
-local indexTabs = create("Frame", { Position = UDim2.fromOffset(12, 92), Size = UDim2.new(1, -24, 0, 40), BackgroundTransparency = 1, Parent = indexPanel }, {
-	create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8) }),
+-- One tab per pack, in a row that scrolls sideways (there are many packs)
+local indexTabs = create("ScrollingFrame", {
+	Position = UDim2.fromOffset(12, 92),
+	Size = UDim2.new(1, -24, 0, 48),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.X,
+	ScrollingDirection = Enum.ScrollingDirection.X,
+	ScrollBarThickness = 6,
+	Parent = indexPanel,
+}, {
+	create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
 })
 local indexGrid = create("ScrollingFrame", {
-	Position = UDim2.fromOffset(12, 142),
-	Size = UDim2.new(1, -24, 1, -154),
+	Position = UDim2.fromOffset(12, 148),
+	Size = UDim2.new(1, -24, 1, -160),
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
 	CanvasSize = UDim2.new(),
