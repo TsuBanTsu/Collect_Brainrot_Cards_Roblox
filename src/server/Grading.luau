@@ -56,7 +56,7 @@ function Grading.grade(player: Player, key: string): (Result?, string?)
 	if not profile then
 		return nil, "Not ready"
 	end
-	local cardId, variantId, scores = Config.splitKey(key)
+	local cardId, variantId, scores, traitId = Config.splitKey(key)
 	if not Config.CARDS[cardId] or not Config.VARIANT[variantId] then
 		return nil, "Unknown card"
 	end
@@ -75,9 +75,9 @@ function Grading.grade(player: Player, key: string): (Result?, string?)
 	local newScores = rollScores(table.find(Config.GRADES, grade) :: number)
 	profile.Cash -= cost
 	PlayerData.removeCard(profile, key, 1)
-	PlayerData.addCard(profile, cardId, variantId, newScores)
+	PlayerData.addCard(profile, cardId, variantId, newScores, traitId)
 	PlayerData.sync(player)
-	return { key = Config.cardKey(cardId, variantId, newScores), scores = newScores, grade = grade.grade }
+	return { key = Config.cardKey(cardId, variantId, newScores, traitId), scores = newScores, grade = grade.grade }
 end
 
 return Grading

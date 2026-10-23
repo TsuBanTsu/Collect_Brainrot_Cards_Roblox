@@ -36,15 +36,16 @@ end
 local function setupLighting()
 	Lighting.ClockTime = 13.5
 	Lighting.GeographicLatitude = 25
-	Lighting.Brightness = 2.3
+	Lighting.Brightness = 1.6
 	Lighting.EnvironmentDiffuseScale = 0.4
 	Lighting.EnvironmentSpecularScale = 0.3
-	-- Bright ambient light: shadows stay soft and colors stay vivid, like a cartoon
-	Lighting.OutdoorAmbient = Color3.fromRGB(165, 165, 175)
-	Lighting.Ambient = Color3.fromRGB(110, 110, 120)
+	-- Soft ambient light: shadows stay soft and colors stay vivid, like a cartoon, without
+	-- washing out the light floors (the plaza looked almost white)
+	Lighting.OutdoorAmbient = Color3.fromRGB(130, 130, 140)
+	Lighting.Ambient = Color3.fromRGB(90, 90, 100)
 	Lighting.GlobalShadows = true
 	Lighting.ShadowSoftness = 0.4
-	Lighting.ExposureCompensation = 0
+	Lighting.ExposureCompensation = -0.25
 
 	local sky = Config.SKY
 	replace("Sky", {
@@ -66,8 +67,15 @@ local function setupLighting()
 		Glare = 0,
 		Haze = 0,
 	})
-	replace("BloomEffect", { Intensity = 0.25, Size = 20, Threshold = 2.4 })
-	replace("ColorCorrectionEffect", { Saturation = 0.22, Contrast = 0.06, Brightness = 0.03, TintColor = Color3.new(1, 1, 1) })
+	replace("BloomEffect", { Intensity = 0.12, Size = 16, Threshold = 2.8 })
+	replace("ColorCorrectionEffect", { Saturation = 0.2, Contrast = 0.08, Brightness = 0, TintColor = Color3.new(1, 1, 1) })
+	-- A ColorGradingEffect left in the place (Retro tonemapper) burns the light areas: neutral tonemapper
+	local grading = Lighting:FindFirstChildOfClass("ColorGradingEffect")
+	if grading then
+		pcall(function()
+			(grading :: any).TonemapperPreset = Enum.TonemapperPreset.Default
+		end)
+	end
 	for _, className in { "SunRaysEffect", "DepthOfFieldEffect" } do
 		local old = Lighting:FindFirstChildOfClass(className)
 		if old then

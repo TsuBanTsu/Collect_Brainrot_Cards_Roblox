@@ -1,8 +1,12 @@
--- The plaza in the middle of the map: a fountain, the paths to the plots, decoration
--- and the 3 stations (Shop, Sell, Grading). Each station has a prompt (key E) that opens
+-- The plaza in the middle of the map: a giant brainrot statue, the paths to the plots, decoration
+-- and the 4 stations (Shop, Sell, Grading, Towers). Each station has a prompt (key E) that opens
 -- its panel on the player's screen; the server checks the player is close before acting.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
 local Assets = require(script.Parent.Assets)
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local Plaza = {}
 
@@ -21,6 +25,7 @@ Plaza.STATIONS = {
 	{ id = "shop", name = "PACK SHOP", color = Color3.fromRGB(90, 200, 120), angle = 270, prompt = "Buy packs" },
 	{ id = "sell", name = "SELL", color = Color3.fromRGB(255, 190, 60), angle = 30, prop = "decor_register", prompt = "Sell cards" },
 	{ id = "grade", name = "GRADING", color = Color3.fromRGB(170, 110, 255), angle = 150, prop = "decor_magnifier", prompt = "Grade cards" },
+	{ id = "towers", name = "TOWERS", color = Color3.fromRGB(255, 80, 90), angle = 90, prompt = "Fight in the towers" },
 } :: { Station }
 
 local positions: { [string]: Vector3 } = {}
@@ -75,14 +80,23 @@ end
 ---------------------------------------------------------------------------
 -- Decoration
 ---------------------------------------------------------------------------
-local function buildFountain()
-	if decor("decor_fountain", Vector3.new(0, FLOOR + 0.1, 0)) then
+-- The centerpiece: a giant statue of a brainrot on a golden pedestal, turning slowly
+local function buildStatue()
+	local gold = Color3.fromRGB(255, 200, 60)
+	part({ Name = "PedestalBase", Size = Vector3.new(14, 1.2, 14), Position = Vector3.new(0, FLOOR + 0.6, 0), Color = Color3.fromRGB(240, 240, 245), Material = Enum.Material.SmoothPlastic })
+	part({ Name = "PedestalMiddle", Size = Vector3.new(11, 2.4, 11), Position = Vector3.new(0, FLOOR + 2.4, 0), Color = gold, Material = Enum.Material.SmoothPlastic })
+	part({ Name = "PedestalTop", Size = Vector3.new(12.5, 0.8, 12.5), Position = Vector3.new(0, FLOOR + 4, 0), Color = Color3.fromRGB(240, 240, 245), Material = Enum.Material.SmoothPlastic })
+	local statue = Assets.place(Config.CENTER_STATUE.card, folder, Vector3.new(0, FLOOR + 4.4, 0), 0, Config.CENTER_STATUE.height)
+	if not statue then
 		return
 	end
-	cylinder("FountainBasin", Vector3.new(0, FLOOR + 0.8, 0), 20, 1.6, Color3.fromRGB(200, 200, 210), Enum.Material.Marble)
-	cylinder("FountainWater", Vector3.new(0, FLOOR + 1.2, 0), 18, 1.2, Color3.fromRGB(90, 180, 255), Enum.Material.Glass).Transparency = 0.3
-	cylinder("FountainColumn", Vector3.new(0, FLOOR + 3, 0), 3, 5, Color3.fromRGB(200, 200, 210), Enum.Material.Marble)
-	cylinder("FountainTop", Vector3.new(0, FLOOR + 5.6, 0), 8, 0.8, Color3.fromRGB(200, 200, 210), Enum.Material.Marble)
+	statue.Name = "CenterStatue"
+	local pivot = statue:GetPivot()
+	local angle = 0
+	RunService.Heartbeat:Connect(function(dt)
+		angle += dt * 0.4
+		statue:PivotTo(pivot * CFrame.Angles(0, angle, 0))
+	end)
 end
 
 local function buildTree(position: Vector3, sakura: boolean)
@@ -117,8 +131,8 @@ local function buildLamp(position: Vector3)
 end
 
 local function buildDecoration()
-	buildFountain()
-	-- Flowers around the fountain
+	buildStatue()
+	-- Flowers around the statue
 	for i = 0, 7 do
 		local angle = math.rad(i * 45 + 22.5)
 		decor("decor_flowers", Vector3.new(math.cos(angle) * 15, FLOOR, math.sin(angle) * 15), angle)
@@ -132,7 +146,7 @@ local function buildDecoration()
 			buildLamp(direction * (RADIUS - 3) + side * s * 8 + Vector3.new(0, FLOOR, 0))
 		end
 		local benchAngle = math.rad(i * 60 + 30)
-		if i % 2 == 1 then -- between the stations
+		if i % 2 == 1 and i ~= 1 then -- between the stations (the Towers station takes the bench's place at 90 degrees)
 			local benchDirection = Vector3.new(math.cos(benchAngle), 0, math.sin(benchAngle))
 			local cframe = CFrame.lookAt(benchDirection * (RADIUS - 6), Vector3.zero)
 			local _, yaw = cframe:ToOrientation()
@@ -179,7 +193,7 @@ end
 local function buildStation(station: Station)
 	local angle = math.rad(station.angle)
 	local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
-	-- The counter faces the middle of the plaza: players stand between it and the fountain
+	-- The counter faces the middle of the plaza: players stand between it and the statue
 	local position = direction * STATION_RADIUS
 	local cframe = CFrame.lookAt(position, Vector3.zero)
 	local _, yaw = cframe:ToOrientation()

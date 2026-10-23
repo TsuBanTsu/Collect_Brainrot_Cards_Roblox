@@ -1,5 +1,6 @@
 -- Player UI: cash, weather, backpack, packs (with the card reveal), cards and stands, Index,
--- rewards, notifications and the plaza stations (Shop, Sell, Grading). Everything is created from code. Sizes are designed for a
+-- rewards, notifications and the plaza stations (Shop, Sell, Grading, Towers). The fights
+-- themselves are drawn by Tower.client.luau. Everything is created from code. Sizes are designed for a
 -- 1280x720 screen and a UIScale resizes the whole UI to fit any screen.
 
 local Players = game:GetService("Players")
@@ -23,7 +24,8 @@ local RED = Color3.fromRGB(225, 75, 75)
 local CASH_COLOR = Color3.fromRGB(120, 255, 140)
 local GREY = Color3.fromRGB(110, 110, 125)
 
-local profile = { cards = {}, stands = {}, packs = {}, backpackLevel = 0, index = {}, pity = {}, dailyDay = 0, dailyStreak = 0 }
+local refreshTowers: () -> ()
+local profile = { cards = {}, stands = {}, packs = {}, backpackLevel = 0, index = {}, pity = {}, dailyDay = 0, dailyStreak = 0, team = {}, towers = {}, traitRerolls = 0 }
 
 ---------------------------------------------------------------------------
 -- Small helpers to build the UI
@@ -142,11 +144,12 @@ local function nameColor(cardId: string, variantId: string): Color3
 	return Config.VARIANT[variantId].color
 end
 
--- "Gold Tralalero Tralala [MINT 9]" for an owned card key
+-- "Gold Tralalero Tralala [MINT 9] (HP Boost)" for an owned card key
 local function keyName(key: string): string
 	local cardId, variantId = Config.splitKey(key)
 	local grade = Config.keyGrade(key)
-	return displayName(cardId, variantId) .. (if grade then " [" .. grade.name .. "]" else "")
+	local trait = Config.keyTrait(key)
+	return displayName(cardId, variantId) .. (if grade then " [" .. grade.name .. "]" else "") .. (if trait then " (" .. trait.name .. ")" else "")
 end
 
 -- Most valuable first
@@ -670,8 +673,8 @@ local function refreshCards()
 	local keys = sortedKeys(profile.cards)
 	for order, key in keys do
 		local count = profile.cards[key]
-		local _, variantId, scores = Config.splitKey(key)
-		local nextVariant = if scores then nil else Config.FUSE_NEXT[variantId]
+		local _, variantId, scores, traitId = Config.splitKey(key)
+		local nextVariant = if scores or traitId then nil else Config.FUSE_NEXT[variantId]
 		local row = cardRow(inventoryList, order, key, count, if nextVariant then 256 else 100)
 		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(90, 36), Text = "PLACE", BackgroundColor3 = ACCENT }, function()
 			remotes.PlaceCard:FireServer(key)
@@ -989,6 +992,167 @@ local function refreshRewards()
 end
 
 ---------------------------------------------------------------------------
+-- Towers (plaza station): the team of 3 cards, the Trait Rerolls and the 4 towers
+---------------------------------------------------------------------------
+local TOWERS_COLOR = Color3.fromRGB(255, 80, 90)
+local towersPanel = makePanel("Towers", "TOWERS", TOWERS_COLOR, Vector2.new(940, 540))
+textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.fromOffset(520, 26), Text = "Your cards (the more Cash, the stronger)", TextXAlignment = Enum.TextXAlignment.Left, Parent = towersPanel })
+local towerCardsList = scrollingList({ Position = UDim2.fromOffset(12, 92), Size = UDim2.new(0, 540, 1, -104), Parent = towersPanel })
+local teamTitle = textLabel({ Position = UDim2.fromOffset(570, 60), Size = UDim2.fromOffset(200, 26), Text = "Team", TextXAlignment = Enum.TextXAlignment.Left, Parent = towersPanel })
+local teamList = create("Frame", { Position = UDim2.fromOffset(566, 92), Size = UDim2.fromOffset(360, 160), BackgroundTransparency = 1, Parent = towersPanel }, {
+	create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+local rerollLabel = textLabel({ Position = UDim2.fromOffset(570, 254), Size = UDim2.fromOffset(350, 22), Text = "", TextColor3 = Color3.fromRGB(255, 215, 60), TextXAlignment = Enum.TextXAlignment.Left, Parent = towersPanel })
+local towerList = create("Frame", { Position = UDim2.fromOffset(566, 282), Size = UDim2.fromOffset(360, 246), BackgroundTransparency = 1, Parent = towersPanel }, {
+	create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+
+local function statsText(key: string): string
+	local stats = Config.keyStats(key)
+	return "❤ " .. Format.number(stats.hp) .. "   ⚔ " .. Format.number(stats.dmg)
+end
+
+local function power(key: string): number
+	local stats = Config.keyStats(key)
+	return stats.hp * stats.dmg
+end
+
+-- Every owned card key (backpack and stands) with its count, strongest first
+local function ownedCards(): ({ string }, { [string]: number })
+	local counts = {}
+	for key, count in profile.cards do
+		counts[key] = (counts[key] or 0) + count
+	end
+	for _, key in profile.stands do
+		counts[key] = (counts[key] or 0) + 1
+	end
+	local keys = {}
+	for key in counts do
+		table.insert(keys, key)
+	end
+	table.sort(keys, function(a, b)
+		local pa, pb = power(a), power(b)
+		if pa ~= pb then
+			return pa > pb
+		end
+		return a < b
+	end)
+	return keys, counts
+end
+
+local function setTeam(team: { string })
+	profile.team = team
+	remotes.SetTeam:FireServer(team)
+	refreshTowers()
+end
+
+local rerolling = false
+
+refreshTowers = function()
+	local team = profile.team or {}
+	local keys, counts = ownedCards()
+	local inTeam = {}
+	for _, key in team do
+		inTeam[key] = (inTeam[key] or 0) + 1
+	end
+
+	clearList(towerCardsList)
+	for order, key in keys do
+		local cardId, variantId = Config.splitKey(key)
+		local row = create("Frame", { LayoutOrder = order, Size = UDim2.new(1, -10, 0, 48), BackgroundColor3 = PANEL, Parent = towerCardsList }, { corner(8), stroke(1.5) })
+		local count = counts[key]
+		textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -250, 0, 22), Text = keyName(key) .. (if count > 1 then "  x" .. count else ""), TextColor3 = nameColor(cardId, variantId), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		textLabel({ Position = UDim2.fromOffset(10, 26), Size = UDim2.new(1, -250, 0, 18), Text = statsText(key), TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local used = inTeam[key] or 0
+		local canAdd = #team < Config.TEAM_SIZE and used < count
+		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(100, 36), Text = if used > 0 and not canAdd then "IN TEAM" else "ADD", BackgroundColor3 = if canAdd then ACCENT else GREY }, function()
+			if canAdd then
+				local newTeam = table.clone(team)
+				table.insert(newTeam, key)
+				setTeam(newTeam)
+			elseif #team >= Config.TEAM_SIZE then
+				toast("Your team is full: remove a card first", RED)
+			end
+		end).Parent = row
+		-- Trait Reroll: only for cards in the backpack
+		if (profile.traitRerolls or 0) > 0 and (profile.cards[key] or 0) > 0 then
+			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -116, 0.5, 0), Size = UDim2.fromOffset(110, 36), Text = "🎲 TRAIT", BackgroundColor3 = Color3.fromRGB(200, 150, 40) }, function()
+				if rerolling then
+					return
+				end
+				rerolling = true
+				remotes.RerollTrait:InvokeServer(key)
+				rerolling = false
+			end).Parent = row
+		end
+	end
+	if #keys == 0 then
+		textLabel({ Size = UDim2.new(1, -10, 0, 30), Text = "No cards yet: open some packs first!", TextColor3 = GREY, Parent = towerCardsList })
+	end
+
+	clearList(teamList)
+	teamTitle.Text = string.format("Team %d/%d", #team, Config.TEAM_SIZE)
+	for slot = 1, Config.TEAM_SIZE do
+		local key = team[slot]
+		local row = create("Frame", { LayoutOrder = slot, Size = UDim2.new(1, 0, 0, 46), BackgroundColor3 = if key then PANEL else DARK, Parent = teamList }, { corner(8), stroke(1.5, if key then Color3.new(0, 0, 0) else GREY) })
+		if key then
+			local cardId, variantId = Config.splitKey(key)
+			textLabel({ Position = UDim2.fromOffset(10, 3), Size = UDim2.new(1, -66, 0, 22), Text = slot .. ". " .. keyName(key), TextColor3 = nameColor(cardId, variantId), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+			textLabel({ Position = UDim2.fromOffset(10, 25), Size = UDim2.new(1, -66, 0, 17), Text = statsText(key), TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -6, 0.5, 0), Size = UDim2.fromOffset(40, 34), Text = "X", BackgroundColor3 = RED }, function()
+				local newTeam = table.clone(team)
+				table.remove(newTeam, slot)
+				setTeam(newTeam)
+			end).Parent = row
+		else
+			textLabel({ Position = UDim2.fromOffset(10, 0), Size = UDim2.new(1, -20, 1, 0), Text = slot .. ". Empty: add a card", TextColor3 = GREY, TextScaled = false, TextSize = 20, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		end
+	end
+
+	rerollLabel.Text = string.format("🎲 Trait Rerolls: %d  (one every %d floors)", profile.traitRerolls or 0, Config.TOWER_TRAIT_FLOORS)
+
+	clearList(towerList)
+	for _, tower in Config.TOWERS do
+		local best = (profile.towers or {})[tower.id] or 0
+		local row = create("Frame", { LayoutOrder = tower.order, Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = Color3.new(1, 1, 1), Parent = towerList }, { corner(10), stroke(2), gradient(tower.color:Lerp(DARK, 0.35), tower.color:Lerp(DARK, 0.7)) })
+		textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -130, 0, 26), Text = tower.name, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local floors = if tower.floors then string.format("Best: %d/%d", best, tower.floors) else string.format("Best: floor %d", best)
+		textLabel({ Position = UDim2.fromOffset(10, 31), Size = UDim2.new(1, -130, 0, 19), Text = floors, TextColor3 = Color3.fromRGB(220, 220, 230), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(110, 42), Text = "ENTER", BackgroundColor3 = if #team > 0 then ACCENT else GREY }, function()
+			if #team == 0 then
+				toast("Add cards to your team first", RED)
+				return
+			end
+			for _, panel in panels do
+				panel.Visible = false
+			end
+			remotes.StartTower:FireServer(tower.id)
+		end).Parent = row
+	end
+end
+
+button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -18, 0, 58), Size = UDim2.fromOffset(150, 30), Text = "AUTO TEAM", BackgroundColor3 = ACCENT }, function()
+	local keys, counts = ownedCards()
+	local team = {}
+	for _, key in keys do
+		for _ = 1, counts[key] do
+			if #team < Config.TEAM_SIZE then
+				table.insert(team, key)
+			end
+		end
+	end
+	setTeam(team)
+end).Parent = towersPanel
+
+-- The main UI steps aside while the player is in a tower (Tower.client.luau draws the fight)
+local function refreshInTower()
+	root.Visible = player:GetAttribute("InTower") == nil and player:GetAttribute("TowerScreen") == nil
+end
+player:GetAttributeChangedSignal("InTower"):Connect(refreshInTower)
+player:GetAttributeChangedSignal("TowerScreen"):Connect(refreshInTower)
+refreshInTower()
+
+---------------------------------------------------------------------------
 -- Side buttons
 ---------------------------------------------------------------------------
 local sideBar = create("Frame", {
@@ -1017,6 +1181,7 @@ local function refreshAll()
 	refreshCards()
 	refreshIndex()
 	refreshRewards()
+	refreshTowers()
 end
 
 remotes.ProfileSync.OnClientEvent:Connect(function(data)
@@ -1027,7 +1192,7 @@ end)
 ---------------------------------------------------------------------------
 -- Plaza stations: their prompt (key E) opens their panel, walking away closes it
 ---------------------------------------------------------------------------
-local STATION_PANELS = { shop = "Shop", sell = "Sell", grade = "Grade" }
+local STATION_PANELS = { shop = "Shop", sell = "Sell", grade = "Grade", towers = "Towers" }
 local stationPrompt: ProximityPrompt? = nil
 
 ProximityPromptService.PromptTriggered:Connect(function(prompt)

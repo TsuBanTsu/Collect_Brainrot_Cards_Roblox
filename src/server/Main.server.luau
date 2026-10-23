@@ -1,5 +1,6 @@
 -- Server entry point: builds the map, then handles the shop, packs, stands, fusion,
 -- selling, grading, income every second, weather, daily rewards and codes.
+-- The towers (fights) live in Towers.luau.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,6 +14,7 @@ local Packs = require(script.Parent.Packs)
 local Plaza = require(script.Parent.Plaza)
 local PlayerData = require(script.Parent.PlayerData)
 local Plots = require(script.Parent.Plots)
+local Towers = require(script.Parent.Towers)
 local Weather = require(script.Parent.Weather)
 
 ---------------------------------------------------------------------------
@@ -20,12 +22,12 @@ local Weather = require(script.Parent.Weather)
 ---------------------------------------------------------------------------
 local remotes = Instance.new("Folder")
 remotes.Name = "Remotes"
-for _, name in { "ProfileSync", "RequestSync", "Notify", "Announce", "PlaceCard", "RemoveCard", "PlaceBest", "Fuse", "ClaimDaily", "BuyPack", "UpgradeBackpack", "SellCard", "SellPack" } do
+for _, name in { "ProfileSync", "RequestSync", "Notify", "Announce", "PlaceCard", "RemoveCard", "PlaceBest", "Fuse", "ClaimDaily", "BuyPack", "UpgradeBackpack", "SellCard", "SellPack", "TowerEvent", "SetTeam", "StartTower", "LeaveTower" } do
 	local remote = Instance.new("RemoteEvent")
 	remote.Name = name
 	remote.Parent = remotes
 end
-for _, name in { "OpenPack", "RedeemCode", "Grade" } do
+for _, name in { "OpenPack", "RedeemCode", "Grade", "RerollTrait" } do
 	local remote = Instance.new("RemoteFunction")
 	remote.Name = name
 	remote.Parent = remotes
@@ -50,6 +52,7 @@ Plots.init()
 Plaza.build(Plots.folder())
 PlayerData.init(remotes)
 Weather.init(announce)
+Towers.init(remotes, notify, announce)
 
 local function refreshPlot(player: Player)
 	local profile = PlayerData.get(player)
@@ -287,13 +290,17 @@ remotes.Fuse.OnServerEvent:Connect(function(player, key: any)
 	if not profile or type(key) ~= "string" then
 		return
 	end
-	local cardId, variantId, scores = Config.splitKey(key)
+	local cardId, variantId, scores, traitId = Config.splitKey(key)
 	local nextVariant = Config.FUSE_NEXT[variantId]
 	if not Config.CARDS[cardId] or not nextVariant then
 		return
 	end
 	if scores then
 		notify(player, "Graded cards can't be fused")
+		return
+	end
+	if traitId then
+		notify(player, "Cards with a trait can't be fused")
 		return
 	end
 	if not PlayerData.removeCard(profile, key, Config.FUSE_COUNT) then
