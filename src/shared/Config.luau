@@ -638,12 +638,13 @@ Config.ASSETS = {
 	garama = { id = 0 },
 } :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
 
+-- The giant statue in the middle of the plaza: one of the card models (Config.ASSETS)
+Config.CENTER_STATUE = { card = "strawberry", height = 20 }
+
 -- Free Creator Store models that decorate the plaza (same loading as the brainrots).
 -- If one is missing, a simple shape built from parts takes its place.
 -- `size` (instead of `height`) scales a flat model by its longest side.
 Config.DECOR = {
-	-- The big blocky tree in the middle of the plaza (Chris12902, verified, no script)
-	decor_bigtree = { id = 112017329, height = 34 },
 	decor_stall = { id = 15147571772, height = 11 },
 	decor_lamp = { id = 15472204631, height = 14 },
 	decor_tree = { id = 580221169, height = 22 },

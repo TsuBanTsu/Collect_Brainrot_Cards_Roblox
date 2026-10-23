@@ -1,8 +1,12 @@
--- The plaza in the middle of the map: a giant tree, the paths to the plots, decoration
+-- The plaza in the middle of the map: a giant brainrot statue, the paths to the plots, decoration
 -- and the 4 stations (Shop, Sell, Grading, Towers). Each station has a prompt (key E) that opens
 -- its panel on the player's screen; the server checks the player is close before acting.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
 local Assets = require(script.Parent.Assets)
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local Plaza = {}
 
@@ -76,14 +80,23 @@ end
 ---------------------------------------------------------------------------
 -- Decoration
 ---------------------------------------------------------------------------
--- The centerpiece: a giant blocky tree on a round patch of grass
-local function buildCenterTree()
-	cylinder("CenterGrass", Vector3.new(0, FLOOR + 0.15, 0), 16, 0.3, Color3.fromRGB(75, 200, 75), Enum.Material.Grass)
-	if decor("decor_bigtree", Vector3.new(0, FLOOR + 0.3, 0)) then
+-- The centerpiece: a giant statue of a brainrot on a golden pedestal, turning slowly
+local function buildStatue()
+	local gold = Color3.fromRGB(255, 200, 60)
+	part({ Name = "PedestalBase", Size = Vector3.new(14, 1.2, 14), Position = Vector3.new(0, FLOOR + 0.6, 0), Color = Color3.fromRGB(240, 240, 245), Material = Enum.Material.SmoothPlastic })
+	part({ Name = "PedestalMiddle", Size = Vector3.new(11, 2.4, 11), Position = Vector3.new(0, FLOOR + 2.4, 0), Color = gold, Material = Enum.Material.SmoothPlastic })
+	part({ Name = "PedestalTop", Size = Vector3.new(12.5, 0.8, 12.5), Position = Vector3.new(0, FLOOR + 4, 0), Color = Color3.fromRGB(240, 240, 245), Material = Enum.Material.SmoothPlastic })
+	local statue = Assets.place(Config.CENTER_STATUE.card, folder, Vector3.new(0, FLOOR + 4.4, 0), 0, Config.CENTER_STATUE.height)
+	if not statue then
 		return
 	end
-	cylinder("CenterTrunk", Vector3.new(0, FLOOR + 8, 0), 3, 16, Color3.fromRGB(110, 70, 40), Enum.Material.Wood)
-	part({ Name = "CenterLeaves", Size = Vector3.new(18, 7, 18), Position = Vector3.new(0, FLOOR + 18, 0), Color = Color3.fromRGB(40, 140, 60), Material = Enum.Material.Grass })
+	statue.Name = "CenterStatue"
+	local pivot = statue:GetPivot()
+	local angle = 0
+	RunService.Heartbeat:Connect(function(dt)
+		angle += dt * 0.4
+		statue:PivotTo(pivot * CFrame.Angles(0, angle, 0))
+	end)
 end
 
 local function buildTree(position: Vector3, sakura: boolean)
@@ -118,8 +131,8 @@ local function buildLamp(position: Vector3)
 end
 
 local function buildDecoration()
-	buildCenterTree()
-	-- Flowers around the tree
+	buildStatue()
+	-- Flowers around the statue
 	for i = 0, 7 do
 		local angle = math.rad(i * 45 + 22.5)
 		decor("decor_flowers", Vector3.new(math.cos(angle) * 15, FLOOR, math.sin(angle) * 15), angle)
@@ -180,7 +193,7 @@ end
 local function buildStation(station: Station)
 	local angle = math.rad(station.angle)
 	local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
-	-- The counter faces the middle of the plaza: players stand between it and the tree
+	-- The counter faces the middle of the plaza: players stand between it and the statue
 	local position = direction * STATION_RADIUS
 	local cframe = CFrame.lookAt(position, Vector3.zero)
 	local _, yaw = cframe:ToOrientation()
