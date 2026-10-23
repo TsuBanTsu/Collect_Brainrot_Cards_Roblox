@@ -6,22 +6,24 @@ local Config = {}
 ---------------------------------------------------------------------------
 -- Rarities, from the most common to the rarest
 ---------------------------------------------------------------------------
-export type Rarity = { id: string, name: string, order: number, color: Color3, cash: number }
+export type Rarity = { id: string, name: string, order: number, color: Color3, cash: number, accent: Color3? }
 
+-- One clearly different color per rarity. From Secret up, `accent` is a second color: the
+-- card's border is a gradient between the two that turns slowly (Infinity: the whole rainbow).
 Config.RARITIES = {
-	{ id = "common", name = "Common", order = 1, color = Color3.fromRGB(190, 190, 190), cash = 1 },
-	{ id = "uncommon", name = "Uncommon", order = 2, color = Color3.fromRGB(110, 220, 110), cash = 2 },
-	{ id = "rare", name = "Rare", order = 3, color = Color3.fromRGB(80, 160, 255), cash = 5 },
-	{ id = "epic", name = "Epic", order = 4, color = Color3.fromRGB(180, 90, 255), cash = 25 },
-	{ id = "legendary", name = "Legendary", order = 5, color = Color3.fromRGB(255, 190, 40), cash = 120 },
-	{ id = "mythic", name = "Mythic", order = 6, color = Color3.fromRGB(255, 70, 90), cash = 600 },
-	{ id = "secret", name = "Secret", order = 7, color = Color3.fromRGB(235, 235, 255), cash = 3000 },
-	{ id = "divine", name = "Divine", order = 8, color = Color3.fromRGB(255, 140, 230), cash = 15000 },
-	{ id = "god", name = "Brainrot God", order = 9, color = Color3.fromRGB(255, 225, 80), cash = 75000 },
-	{ id = "og", name = "OG", order = 10, color = Color3.fromRGB(255, 120, 30), cash = 375000 },
-	{ id = "celestial", name = "Celestial", order = 11, color = Color3.fromRGB(130, 200, 255), cash = 1875000 },
-	{ id = "eternal", name = "Eternal", order = 12, color = Color3.fromRGB(255, 255, 150), cash = 9375000 },
-	{ id = "infinity", name = "Infinity", order = 13, color = Color3.fromRGB(60, 255, 150), cash = 46875000 },
+	{ id = "common", name = "Common", order = 1, color = Color3.fromRGB(175, 180, 190), cash = 1 },
+	{ id = "uncommon", name = "Uncommon", order = 2, color = Color3.fromRGB(80, 210, 90), cash = 2 },
+	{ id = "rare", name = "Rare", order = 3, color = Color3.fromRGB(50, 135, 255), cash = 5 },
+	{ id = "epic", name = "Epic", order = 4, color = Color3.fromRGB(165, 75, 255), cash = 25 },
+	{ id = "legendary", name = "Legendary", order = 5, color = Color3.fromRGB(255, 165, 20), cash = 120 },
+	{ id = "mythic", name = "Mythic", order = 6, color = Color3.fromRGB(255, 55, 75), cash = 600 },
+	{ id = "secret", name = "Secret", order = 7, color = Color3.fromRGB(245, 245, 255), accent = Color3.fromRGB(60, 60, 80), cash = 3000 },
+	{ id = "divine", name = "Divine", order = 8, color = Color3.fromRGB(255, 105, 200), accent = Color3.fromRGB(255, 235, 250), cash = 15000 },
+	{ id = "god", name = "Brainrot God", order = 9, color = Color3.fromRGB(255, 235, 60), accent = Color3.fromRGB(255, 120, 30), cash = 75000 },
+	{ id = "og", name = "OG", order = 10, color = Color3.fromRGB(30, 220, 190), accent = Color3.fromRGB(20, 70, 90), cash = 375000 },
+	{ id = "celestial", name = "Celestial", order = 11, color = Color3.fromRGB(110, 225, 255), accent = Color3.fromRGB(255, 255, 255), cash = 1875000 },
+	{ id = "eternal", name = "Eternal", order = 12, color = Color3.fromRGB(110, 90, 255), accent = Color3.fromRGB(255, 120, 220), cash = 9375000 },
+	{ id = "infinity", name = "Infinity", order = 13, color = Color3.fromRGB(60, 255, 150), accent = Color3.fromRGB(255, 80, 80), cash = 46875000 },
 } :: { Rarity }
 
 Config.RARITY = {} :: { [string]: Rarity }
@@ -610,6 +612,20 @@ function Config.packCards(packId: string): { Card }
 	end)
 	return list
 end
+
+-- Full art cards: the rarest cards of each pack. Their picture fills the whole card.
+function Config.isFullArt(cardId: string): boolean
+	local card = Config.CARDS[cardId]
+	local best = 0
+	for rarityId in Config.PACK[card.pack].cards do
+		best = math.max(best, Config.RARITY[rarityId].order)
+	end
+	return Config.RARITY[card.rarity].order == best
+end
+
+-- 2D illustrations (uploaded image ids) for the cards that have one, mainly the full arts.
+-- A card without one shows its 3D model.
+Config.CARD_ART = {} :: { [string]: number }
 
 -- Base chance (0-1) of pulling this exact card in its pack, before any luck or weather
 function Config.cardChance(cardId: string): number

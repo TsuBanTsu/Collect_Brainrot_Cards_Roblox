@@ -1,16 +1,21 @@
--- Draws a card: frame colored by rarity (gold, rainbow or holo for variants), the brainrot's
--- picture (its 3D model in a ViewportFrame, or else the thumbnail of its Creator Store model),
--- its name, rarity and grade.
+-- Draws a card: a thick border in its rarity's color around a dark panel, the brainrot's
+-- picture (its 2D illustration, its 3D model in a ViewportFrame, or else the thumbnail of its
+-- Creator Store model), its name and Cash. Variants add a colored reflection and a badge in the
+-- top right corner, a trait a badge in the top left one. Graded cards sit in a plastic sleeve
+-- with their grade written above. The rarest cards of each pack are full arts.
 -- Used by the UI and by the cards standing on the plots (SurfaceGui).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(script.Parent.Config)
+local Format = require(script.Parent.Format)
 
 local CardArt = {}
 
 local FONT = Enum.Font.FredokaOne
 local DARK = Color3.fromRGB(24, 22, 36)
+local PANEL = Color3.fromRGB(35, 30, 55)
+local WHITE = Color3.new(1, 1, 1)
 
 local RAINBOW = ColorSequence.new({
 	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
@@ -50,7 +55,21 @@ local function text(parent: Instance, props): TextLabel
 	return label
 end
 
--- The colors of the frame around the card
+-- The border of a card of this rarity. From Secret up it mixes two colors; the UI turns it.
+function CardArt.rarityColors(rarity: Config.Rarity): ColorSequence
+	if rarity.id == "infinity" then
+		return RAINBOW
+	elseif rarity.accent then
+		return ColorSequence.new({
+			ColorSequenceKeypoint.new(0, rarity.color),
+			ColorSequenceKeypoint.new(0.5, rarity.accent),
+			ColorSequenceKeypoint.new(1, rarity.color),
+		})
+	end
+	return ColorSequence.new(rarity.color:Lerp(WHITE, 0.3), rarity.color)
+end
+
+-- The colors of a variant's reflection (or of the card's border for a normal card)
 function CardArt.frameColors(cardId: string, variantId: string): ColorSequence
 	if variantId == "gold" then
 		return GOLD
@@ -59,8 +78,7 @@ function CardArt.frameColors(cardId: string, variantId: string): ColorSequence
 	elseif variantId == "holo" then
 		return HOLO
 	end
-	local color = Config.RARITY[Config.CARDS[cardId].rarity].color
-	return ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.35), color:Lerp(Color3.new(0, 0, 0), 0.25))
+	return CardArt.rarityColors(Config.RARITY[Config.CARDS[cardId].rarity])
 end
 
 -- The picture of a card: the thumbnail of its 3D model, or "" if it has none
@@ -77,14 +95,14 @@ local function template(cardId: string): Model?
 end
 
 -- Shows the model in a ViewportFrame, seen from the front and a bit from above
-local function viewport(window: Frame, model: Model, z: number)
-	local view = new("ViewportFrame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Ambient = Color3.fromRGB(200, 200, 200), LightColor = Color3.new(1, 1, 1), LightDirection = Vector3.new(-1, -1, 1), ZIndex = z }, window)
+local function viewport(window: Frame, model: Model, z: number, zoom: number)
+	local view = new("ViewportFrame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Ambient = Color3.fromRGB(200, 200, 200), LightColor = WHITE, LightDirection = Vector3.new(-1, -1, 1), ZIndex = z }, window)
 	local copy = model:Clone()
 	copy.Parent = view
 	local box, size = copy:GetBoundingBox()
 	local camera = Instance.new("Camera")
 	camera.FieldOfView = 40
-	local distance = (size.Magnitude / 2) / math.tan(math.rad(20)) * 0.9
+	local distance = (size.Magnitude / 2) / math.tan(math.rad(20)) * zoom
 	-- Models face -Z: the camera stands on that side
 	local direction = Vector3.new(0.35, 0.3, -1).Unit
 	camera.CFrame = CFrame.lookAt(box.Position + direction * distance, box.Position)
@@ -92,68 +110,133 @@ local function viewport(window: Frame, model: Model, z: number)
 	view.CurrentCamera = camera
 end
 
--- Builds the card inside `parent` (filling it). Returns the card frame and its "shine"
--- frame, a light streak the UI can move across Gold, Rainbow and Holo cards.
-function CardArt.build(parent: Instance, cardId: string, variantId: string, grade: Config.Grade?, zIndex: number?): (Frame, Frame?)
+-- The brainrot's picture inside `window`
+local function picture(window: Frame, parent: Instance, card: Config.Card, z: number, zoom: number)
+	local art = Config.CARD_ART[card.id]
+	local model = template(card.id)
+	local image = CardArt.image(card.id)
+	if art then
+		new("ImageLabel", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Image = "rbxassetid://" .. art, ScaleType = Enum.ScaleType.Crop, ZIndex = z }, window)
+	-- ViewportFrames stay blank in the stands' SurfaceGuis: there, the 3D model stands right behind
+	-- the card, so the window shows the initial. The old thumbnail is only for models that aren't loaded.
+	elseif model and not parent:IsA("SurfaceGui") then
+		viewport(window, model, z, zoom)
+	elseif not model and image ~= "" then
+		-- Thumbnails leave a lot of empty space around the model: zoomed in (the window clips it)
+		new("ImageLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.55), Size = UDim2.fromScale(1.5, 1.5), Image = image, ScaleType = Enum.ScaleType.Fit, ZIndex = z }, window)
+	else
+		text(window, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.6, 0.5), Text = string.upper(string.sub(card.name, 1, 1)), ZIndex = z })
+	end
+end
+
+-- A small rounded badge in a corner of the card
+local function badge(parent: Instance, anchorX: number, label: string, color: Color3, colors: ColorSequence?, z: number)
+	local frame = new("Frame", { AnchorPoint = Vector2.new(anchorX, 0), Position = UDim2.fromScale(if anchorX == 0 then 0.03 else 0.97, 0.025), Size = UDim2.fromScale(0.3, 0.085), BackgroundColor3 = if colors then WHITE else color, ZIndex = z }, parent)
+	new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, frame)
+	new("UIStroke", { Thickness = 2, Color = DARK, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, frame)
+	if colors then
+		new("UIGradient", { Rotation = 20, Color = colors }, frame)
+	end
+	text(frame, { Position = UDim2.fromScale(0.08, 0.12), Size = UDim2.fromScale(0.84, 0.76), Text = label, ZIndex = z + 1 })
+end
+
+local TRAIT_LABELS = { dmg = "DMG", hp = "HP", coin = "$$$" }
+
+-- Builds the card inside `parent` (filling it). Returns the outer frame (the sleeve for a graded
+-- card) and its "shine", a light streak the UI can move across Gold, Rainbow and Holo cards.
+-- The UI also turns every UIGradient named "Spin" (the borders of the top rarities).
+function CardArt.build(parent: Instance, cardId: string, variantId: string, grade: Config.Grade?, zIndex: number?, traitId: string?): (Frame, Frame?)
 	local card = Config.CARDS[cardId]
 	local rarity = Config.RARITY[card.rarity]
 	local z = zIndex or 1
+	local fullArt = Config.isFullArt(cardId)
 
-	-- Outer frame: the colored border
-	local frame = new("Frame", { Name = "Card", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = z }, parent)
-	new("UICorner", { CornerRadius = UDim.new(0.07, 0) }, frame)
-	new("UIGradient", { Rotation = 45, Color = CardArt.frameColors(cardId, variantId) }, frame)
-	new("UIStroke", { Thickness = 2, Color = Color3.new(0, 0, 0), Transparency = 0.3 }, frame)
-
-	-- Inner panel with the picture
-	local inner = new("Frame", { Position = UDim2.fromScale(0.05, 0.035), Size = UDim2.fromScale(0.9, 0.93), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = z + 1 }, frame)
-	new("UICorner", { CornerRadius = UDim.new(0.06, 0) }, inner)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(rarity.color:Lerp(DARK, 0.45), DARK) }, inner)
-
-	-- Top bar: rarity
-	text(inner, { Position = UDim2.fromScale(0.06, 0.02), Size = UDim2.fromScale(0.88, 0.09), Text = string.upper(rarity.name), TextColor3 = rarity.color, ZIndex = z + 3 })
-
-	-- Picture window
-	local window = new("Frame", { Position = UDim2.fromScale(0.07, 0.12), Size = UDim2.fromScale(0.86, 0.52), BackgroundColor3 = Color3.new(1, 1, 1), ClipsDescendants = true, ZIndex = z + 2 }, inner)
-	new("UICorner", { CornerRadius = UDim.new(0.08, 0) }, window)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(rarity.color:Lerp(Color3.new(1, 1, 1), 0.55), rarity.color:Lerp(DARK, 0.2)) }, window)
-	-- ViewportFrames stay blank in the stands' SurfaceGuis: there, the 3D model stands right behind
-	-- the card, so the window shows the initial. The old thumbnail is only for models that aren't loaded.
-	local model = template(cardId)
-	local image = CardArt.image(cardId)
-	if model and not parent:IsA("SurfaceGui") then
-		viewport(window, model, z + 3)
-	elseif not model and image ~= "" then
-		-- Thumbnails leave a lot of empty space around the model: zoomed in (the window clips it)
-		new("ImageLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.55), Size = UDim2.fromScale(1.5, 1.5), Image = image, ScaleType = Enum.ScaleType.Fit, ZIndex = z + 3 }, window)
-	else
-		text(window, { Position = UDim2.fromScale(0.2, 0.15), Size = UDim2.fromScale(0.6, 0.7), Text = string.upper(string.sub(card.name, 1, 1)), ZIndex = z + 3 })
+	-- Graded cards: a clear plastic sleeve, the grade on a label above the card
+	local root: Frame
+	local holder: Instance = parent
+	if grade then
+		root = new("Frame", { Name = "Sleeve", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(220, 235, 255), BackgroundTransparency = 0.55, ZIndex = z }, parent)
+		new("UICorner", { CornerRadius = UDim.new(0.05, 0) }, root)
+		new("UIStroke", { Thickness = 3, Color = WHITE, Transparency = 0.1 }, root)
+		local label = new("Frame", { Position = UDim2.fromScale(0.05, 0.02), Size = UDim2.fromScale(0.9, 0.11), BackgroundColor3 = WHITE, ZIndex = z + 1 }, root)
+		new("UICorner", { CornerRadius = UDim.new(0.2, 0) }, label)
+		new("UIStroke", { Thickness = 3, Color = grade.color }, label)
+		text(label, { Position = UDim2.fromScale(0.04, 0.12), Size = UDim2.fromScale(0.66, 0.76), Text = grade.name, TextColor3 = DARK, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = z + 2 })
+		text(label, { Position = UDim2.fromScale(0.72, 0.02), Size = UDim2.fromScale(0.25, 0.96), Text = tostring(grade.grade), TextColor3 = grade.color, ZIndex = z + 2 })
+		holder = new("Frame", { Position = UDim2.fromScale(0.06, 0.155), Size = UDim2.fromScale(0.88, 0.825), BackgroundTransparency = 1, ZIndex = z }, root)
+		z += 2
 	end
 
-	-- Name and variant
-	text(inner, { Position = UDim2.fromScale(0.06, 0.67), Size = UDim2.fromScale(0.88, 0.17), Text = card.name, TextWrapped = true, ZIndex = z + 3 })
+	-- Outer frame: the thick border in the rarity's color
+	local frame = new("Frame", { Name = "Card", Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, ZIndex = z }, holder)
+	new("UICorner", { CornerRadius = UDim.new(0.07, 0) }, frame)
+	new("UIGradient", { Name = if rarity.accent then "Spin" else "Border", Rotation = 45, Color = CardArt.rarityColors(rarity) }, frame)
+	new("UIStroke", { Thickness = 2, Color = DARK, Transparency = 0.2 }, frame)
+	root = root or frame
+
+	-- Dark inner panel with a white outline
+	local inner = new("Frame", { Position = UDim2.fromScale(0.06, 0.045), Size = UDim2.fromScale(0.88, 0.91), BackgroundColor3 = PANEL, ClipsDescendants = true, ZIndex = z + 1 }, frame)
+	new("UICorner", { CornerRadius = UDim.new(0.07, 0) }, inner)
+	new("UIStroke", { Thickness = 2.5, Color = WHITE, Transparency = 0.1 }, inner)
+
+	-- Picture: a window in the middle, or the whole card for full arts
+	local window = new("Frame", {
+		Position = if fullArt then UDim2.fromScale(0, 0) else UDim2.fromScale(0.07, 0.13),
+		Size = if fullArt then UDim2.fromScale(1, 1) else UDim2.fromScale(0.86, 0.55),
+		BackgroundColor3 = WHITE,
+		ClipsDescendants = true,
+		ZIndex = z + 2,
+	}, inner)
+	new("UICorner", { CornerRadius = UDim.new(if fullArt then 0.07 else 0.1, 0) }, window)
+	new("UIGradient", {
+		Rotation = if fullArt then 60 else 90,
+		Color = if fullArt
+			then ColorSequence.new({
+				ColorSequenceKeypoint.new(0, rarity.color:Lerp(WHITE, 0.25)),
+				ColorSequenceKeypoint.new(0.55, (rarity.accent or rarity.color):Lerp(PANEL, 0.35)),
+				ColorSequenceKeypoint.new(1, PANEL),
+			})
+			else ColorSequence.new(rarity.color:Lerp(PANEL, 0.25), PANEL),
+	}, window)
+	picture(window, parent, card, z + 3, if fullArt then 0.75 else 0.9)
+
+	-- Variants: a colored reflection over the picture
+	if variantId ~= "normal" then
+		local foil = new("Frame", { Name = "Foil", Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BackgroundTransparency = if variantId == "gold" then 0.72 else 0.62, ZIndex = z + 4 }, inner)
+		new("UIGradient", { Rotation = 35, Color = CardArt.frameColors(cardId, variantId), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(0.5, 0.8), NumberSequenceKeypoint.new(1, 0.2) }) }, foil)
+	end
+
+	-- Full arts: dark fades behind the texts so they stay readable over the picture
+	if fullArt then
+		for _, top in { true, false } do
+			local fade = new("Frame", { Position = UDim2.fromScale(0, if top then 0 else 0.62), Size = UDim2.fromScale(1, if top then 0.2 else 0.38), BackgroundColor3 = DARK, BorderSizePixel = 0, ZIndex = z + 5 }, inner)
+			new("UIGradient", { Rotation = if top then 90 else -90, Transparency = NumberSequence.new(0.15, 1) }, fade)
+		end
+	end
+
+	-- Rarity at the top, name and Cash at the bottom
+	text(inner, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.02), Size = UDim2.fromScale(0.4, 0.09), Text = string.upper(rarity.name), TextColor3 = rarity.color, ZIndex = z + 6 })
+	text(inner, { Position = UDim2.fromScale(0.06, if fullArt then 0.72 else 0.7), Size = UDim2.fromScale(0.88, 0.15), Text = card.name, TextWrapped = true, ZIndex = z + 6 })
+	text(inner, { Position = UDim2.fromScale(0.15, 0.87), Size = UDim2.fromScale(0.7, 0.09), Text = "$" .. Format.number(Config.cardIncome(cardId, variantId)) .. "/s", TextColor3 = Color3.fromRGB(255, 225, 60), ZIndex = z + 6 })
+
+	-- Badges: the trait top left, the variant top right
+	local trait = traitId and Config.TRAIT[traitId]
+	if trait then
+		badge(inner, 0, TRAIT_LABELS[trait.id] or string.upper(trait.name), trait.color, nil, z + 7)
+	end
 	if variantId ~= "normal" then
 		local variant = Config.VARIANT[variantId]
-		text(inner, { Position = UDim2.fromScale(0.06, 0.86), Size = UDim2.fromScale(0.88, 0.1), Text = string.upper(variant.name), TextColor3 = variant.color, ZIndex = z + 3 })
+		badge(inner, 1, string.upper(variant.name), variant.color, CardArt.frameColors(cardId, variantId), z + 7)
 	end
 
-	-- Grade badge in the corner of the picture
-	if grade then
-		local badge = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(0.97, 0.09), Size = UDim2.fromScale(0.3, 0.13), BackgroundColor3 = DARK, ZIndex = z + 4 }, inner)
-		new("UICorner", { CornerRadius = UDim.new(0.3, 0) }, badge)
-		new("UIStroke", { Thickness = 2, Color = grade.color }, badge)
-		text(badge, { Position = UDim2.fromScale(0.08, 0.1), Size = UDim2.fromScale(0.84, 0.8), Text = tostring(grade.grade), TextColor3 = grade.color, ZIndex = z + 5 })
-	end
-
-	-- Light streak for shiny cards
+	-- Light streak for shiny cards and full arts
 	local shine: Frame? = nil
-	if variantId ~= "normal" then
-		local streak = new("Frame", { Name = "Shine", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(-0.5, 0.5), Size = UDim2.fromScale(0.35, 1.6), Rotation = 20, BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.6, BorderSizePixel = 0, ZIndex = z + 6 }, frame)
+	if variantId ~= "normal" or fullArt then
+		local streak = new("Frame", { Name = "Shine", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(-0.5, 0.5), Size = UDim2.fromScale(0.35, 1.6), Rotation = 20, BackgroundColor3 = WHITE, BackgroundTransparency = 0.6, BorderSizePixel = 0, ZIndex = z + 9 }, inner)
 		new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.2), NumberSequenceKeypoint.new(1, 1) }) }, streak)
-		frame.ClipsDescendants = true
 		shine = streak
 	end
-	return frame, shine
+	return root, shine
 end
 
 return CardArt

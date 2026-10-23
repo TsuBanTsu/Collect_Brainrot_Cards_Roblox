@@ -357,16 +357,26 @@ remotes.Announce.OnClientEvent:Connect(announce)
 ---------------------------------------------------------------------------
 -- A card drawn in the UI (reveal and Index)
 ---------------------------------------------------------------------------
-local function cardFrame(parent: Instance, cardId: string, variantId: string, size: UDim2, zIndex: number?, grade: Config.Grade?): Frame
-	local frame, shine = CardArt.build(parent, cardId, variantId, grade, zIndex)
+local function cardFrame(parent: Instance, cardId: string, variantId: string, size: UDim2, zIndex: number?, grade: Config.Grade?, traitId: string?): Frame
+	local frame, shine = CardArt.build(parent, cardId, variantId, grade, zIndex, traitId)
 	frame.Size = size
-	-- Shiny cards: a light streak sweeps across them every few seconds
+	-- Shiny cards and full arts: a light streak sweeps across them every few seconds
 	if shine then
 		task.spawn(function()
 			while frame.Parent do
 				shine.Position = UDim2.fromScale(-0.5, 0.5)
 				TweenService:Create(shine, TweenInfo.new(0.9, Enum.EasingStyle.Sine), { Position = UDim2.fromScale(1.5, 0.5) }):Play()
 				task.wait(if variantId == "holo" then 1.6 else 2.8)
+			end
+		end)
+	end
+	-- Top rarities: their two-color border turns slowly
+	local spin = frame:FindFirstChild("Spin", true)
+	if spin then
+		task.spawn(function()
+			while frame.Parent do
+				spin.Rotation = (spin.Rotation + 3) % 360
+				task.wait(1 / 30)
 			end
 		end)
 	end
@@ -873,7 +883,7 @@ showGrade = function(result)
 	gradeTitle.Text = displayName(cardId, variantId)
 	-- The card again, now with its grade badge
 	clearList(gradeCardHolder)
-	cardFrame(gradeCardHolder, cardId, variantId, UDim2.fromScale(1, 1), 11, grade)
+	cardFrame(gradeCardHolder, cardId, variantId, UDim2.fromScale(1, 1), 11, grade, (Config.keyTrait(result.key) or {} :: any).id)
 	gradeResult.Text = string.format("Average %.2f  ·  %s  ·  %s Cash", total / #result.scores, grade.name, Format.multiplier(grade.cash))
 	gradeResult.TextColor3 = grade.color
 	local pop = create("UIScale", { Scale = if grade.grade >= 8 then 1.8 else 1.2, Parent = gradeResult })

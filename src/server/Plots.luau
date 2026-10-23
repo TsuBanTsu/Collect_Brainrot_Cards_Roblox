@@ -248,7 +248,7 @@ local function showCard(stand: Stand, key: string)
 	})
 	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
 		local gui = surfaceGui(cardPart, face, 70)
-		CardArt.build(gui, cardId, variantId, grade)
+		CardArt.build(gui, cardId, variantId, grade, nil, (Config.keyTrait(key) or {} :: any).id)
 	end
 	if variantId == "holo" or variantId == "rainbow" then
 		local sparkles = Instance.new("Sparkles")
