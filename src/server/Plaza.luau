@@ -1,4 +1,4 @@
--- The plaza in the middle of the map: a fountain, the paths to the plots, decoration
+-- The plaza in the middle of the map: a giant tree, the paths to the plots, decoration
 -- and the 4 stations (Shop, Sell, Grading, Towers). Each station has a prompt (key E) that opens
 -- its panel on the player's screen; the server checks the player is close before acting.
 
@@ -76,14 +76,14 @@ end
 ---------------------------------------------------------------------------
 -- Decoration
 ---------------------------------------------------------------------------
-local function buildFountain()
-	if decor("decor_fountain", Vector3.new(0, FLOOR + 0.1, 0)) then
+-- The centerpiece: a giant blocky tree on a round patch of grass
+local function buildCenterTree()
+	cylinder("CenterGrass", Vector3.new(0, FLOOR + 0.15, 0), 16, 0.3, Color3.fromRGB(75, 200, 75), Enum.Material.Grass)
+	if decor("decor_bigtree", Vector3.new(0, FLOOR + 0.3, 0)) then
 		return
 	end
-	cylinder("FountainBasin", Vector3.new(0, FLOOR + 0.8, 0), 20, 1.6, Color3.fromRGB(200, 200, 210), Enum.Material.Marble)
-	cylinder("FountainWater", Vector3.new(0, FLOOR + 1.2, 0), 18, 1.2, Color3.fromRGB(90, 180, 255), Enum.Material.Glass).Transparency = 0.3
-	cylinder("FountainColumn", Vector3.new(0, FLOOR + 3, 0), 3, 5, Color3.fromRGB(200, 200, 210), Enum.Material.Marble)
-	cylinder("FountainTop", Vector3.new(0, FLOOR + 5.6, 0), 8, 0.8, Color3.fromRGB(200, 200, 210), Enum.Material.Marble)
+	cylinder("CenterTrunk", Vector3.new(0, FLOOR + 8, 0), 3, 16, Color3.fromRGB(110, 70, 40), Enum.Material.Wood)
+	part({ Name = "CenterLeaves", Size = Vector3.new(18, 7, 18), Position = Vector3.new(0, FLOOR + 18, 0), Color = Color3.fromRGB(40, 140, 60), Material = Enum.Material.Grass })
 end
 
 local function buildTree(position: Vector3, sakura: boolean)
@@ -118,8 +118,8 @@ local function buildLamp(position: Vector3)
 end
 
 local function buildDecoration()
-	buildFountain()
-	-- Flowers around the fountain
+	buildCenterTree()
+	-- Flowers around the tree
 	for i = 0, 7 do
 		local angle = math.rad(i * 45 + 22.5)
 		decor("decor_flowers", Vector3.new(math.cos(angle) * 15, FLOOR, math.sin(angle) * 15), angle)
@@ -180,7 +180,7 @@ end
 local function buildStation(station: Station)
 	local angle = math.rad(station.angle)
 	local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
-	-- The counter faces the middle of the plaza: players stand between it and the fountain
+	-- The counter faces the middle of the plaza: players stand between it and the tree
 	local position = direction * STATION_RADIUS
 	local cframe = CFrame.lookAt(position, Vector3.zero)
 	local _, yaw = cframe:ToOrientation()

@@ -69,6 +69,13 @@ local function setupLighting()
 	})
 	replace("BloomEffect", { Intensity = 0.12, Size = 16, Threshold = 2.8 })
 	replace("ColorCorrectionEffect", { Saturation = 0.2, Contrast = 0.08, Brightness = 0, TintColor = Color3.new(1, 1, 1) })
+	-- A ColorGradingEffect left in the place (Retro tonemapper) burns the light areas: neutral tonemapper
+	local grading = Lighting:FindFirstChildOfClass("ColorGradingEffect")
+	if grading then
+		pcall(function()
+			(grading :: any).TonemapperPreset = Enum.TonemapperPreset.Default
+		end)
+	end
 	for _, className in { "SunRaysEffect", "DepthOfFieldEffect" } do
 		local old = Lighting:FindFirstChildOfClass(className)
 		if old then

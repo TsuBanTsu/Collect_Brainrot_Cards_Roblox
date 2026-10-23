@@ -73,7 +73,7 @@ local function buildCenter()
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Anchored = true
 	spawn.Size = Vector3.new(10, 1, 10)
-	spawn.Position = Vector3.new(0, 0.6, 18) -- in front of the fountain (Plaza.luau)
+	spawn.Position = Vector3.new(0, 0.6, 18) -- in front of the big tree (Plaza.luau)
 	spawn.Transparency = 1
 	spawn.CanCollide = false
 	spawn.Neutral = true

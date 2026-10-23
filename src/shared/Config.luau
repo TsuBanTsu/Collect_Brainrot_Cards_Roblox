@@ -642,7 +642,8 @@ Config.ASSETS = {
 -- If one is missing, a simple shape built from parts takes its place.
 -- `size` (instead of `height`) scales a flat model by its longest side.
 Config.DECOR = {
-	decor_fountain = { id = 11423259371, height = 9 },
+	-- The big blocky tree in the middle of the plaza (Chris12902, verified, no script)
+	decor_bigtree = { id = 112017329, height = 34 },
 	decor_stall = { id = 15147571772, height = 11 },
 	decor_lamp = { id = 15472204631, height = 14 },
 	decor_tree = { id = 580221169, height = 22 },
