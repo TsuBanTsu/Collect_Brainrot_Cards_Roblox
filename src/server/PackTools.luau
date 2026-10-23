@@ -18,11 +18,12 @@ local function makeTool(pack: Config.Pack): Tool
 	tool.CanBeDropped = false
 	tool.ToolTip = "Click to open"
 	tool:SetAttribute("PackId", pack.id)
-	tool.GripPos = Vector3.new(0, -0.6, 0.2)
+	-- Held up in front of the character, its front facing forward
+	tool.Grip = CFrame.new(0, -1.1, -0.4) * CFrame.Angles(0, math.rad(180), 0)
 
 	local handle = Instance.new("Part")
 	handle.Name = "Handle"
-	handle.Size = Vector3.new(1.6, 2.24, 0.15)
+	handle.Size = Vector3.new(2, 2.8, 0.15)
 	handle.Color = pack.color
 	handle.Material = Enum.Material.SmoothPlastic
 	handle.CanCollide = false

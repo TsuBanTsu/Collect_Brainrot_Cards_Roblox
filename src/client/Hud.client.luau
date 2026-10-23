@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
+local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
@@ -799,12 +800,19 @@ end)
 -- Packs in the Roblox backpack (PackTools.luau): click or tap while holding one to open it.
 -- A big OPEN button also shows while a pack is in hand, easier to hit on phones.
 local heldPack: string? = nil
-local openHeld = button({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -110), Size = UDim2.fromOffset(240, 64), Text = "OPEN PACK", BackgroundColor3 = ACCENT, Visible = false }, function()
+local openHeld = button({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -110), Size = UDim2.fromOffset(200, 54), Text = "OPEN PACK", BackgroundColor3 = ACCENT, Visible = false }, function()
 	if heldPack then
 		openPack(heldPack)
 	end
 end)
 openHeld.Parent = root
+-- During the opening: no OPEN PACK button, and the Roblox hotbar steps aside too
+reveal:GetPropertyChangedSignal("Visible"):Connect(function()
+	openHeld.Visible = heldPack ~= nil and not reveal.Visible
+	pcall(function()
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, not reveal.Visible)
+	end)
+end)
 
 local function watchTool(tool: Instance)
 	local packId = tool:IsA("Tool") and tool:GetAttribute("PackId")
@@ -818,7 +826,7 @@ local function watchTool(tool: Instance)
 	end)
 	t.Equipped:Connect(function()
 		heldPack = packId
-		openHeld.Visible = true
+		openHeld.Visible = not reveal.Visible
 	end)
 	t.Unequipped:Connect(function()
 		if heldPack == packId then
