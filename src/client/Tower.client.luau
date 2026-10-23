@@ -353,7 +353,8 @@ local team: { Unit? } = {}
 local front = 0 -- index of the team card that fights
 local enemy: Unit? = nil
 local earned = { cash = 0, packs = 0, rerolls = 0, cards = 0 }
-local cameraConnection: RBXScriptConnection? = nil
+local CAMERA_STEP = "TowerCamera"
+local cameraBound = false
 
 local function frontCFrame(side: number): CFrame
 	-- side -1: the team (facing +X), 1: the enemy (facing -X); models face -Z by default
@@ -395,9 +396,9 @@ local function cleanup()
 	end
 	team = {}
 	enemy = nil
-	if cameraConnection then
-		cameraConnection:Disconnect()
-		cameraConnection = nil
+	if cameraBound then
+		RunService:UnbindFromRenderStep(CAMERA_STEP)
+		cameraBound = false
 	end
 	local camera = Workspace.CurrentCamera
 	if camera then
@@ -431,11 +432,19 @@ local function onStart(event)
 	end
 	front = 1
 
-	-- Fixed camera from the open side of the stands, with a little shake on impacts
-	local camera = Workspace.CurrentCamera
-	camera.CameraType = Enum.CameraType.Scriptable
+	-- Fixed camera from the open side of the stands, with a little shake on impacts.
+	-- Runs right after Roblox's camera scripts and forces Scriptable every frame: set only once,
+	-- they could switch it back to following the character (seen on a second run).
 	local started = os.clock()
-	cameraConnection = RunService.RenderStepped:Connect(function(dt)
+	cameraBound = true
+	RunService:BindToRenderStep(CAMERA_STEP, Enum.RenderPriority.Camera.Value + 1, function(dt)
+		local camera = Workspace.CurrentCamera
+		if not camera then
+			return
+		end
+		if camera.CameraType ~= Enum.CameraType.Scriptable then
+			camera.CameraType = Enum.CameraType.Scriptable
+		end
 		local t = os.clock() - started
 		local offset = Vector3.zero
 		if shake > 0 then
