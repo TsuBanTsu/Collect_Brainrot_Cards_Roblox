@@ -107,7 +107,7 @@ function Packs.open(player: Player, packId: string): ({ Pull }?, string?)
 	profile.PacksOpened += 1
 
 	local buffs = Weather.buffs()
-	local pityOrder = Config.RARITY[Config.PITY_RARITY].order
+	local pityOrder = Config.pityRarity(packId).order
 	local pityReady = (profile.Pity[packId] or 0) >= Config.PITY_PACKS - 1
 	local gotPityRarity = false
 

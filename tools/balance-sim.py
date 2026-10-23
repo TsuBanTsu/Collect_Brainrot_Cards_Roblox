@@ -1,8 +1,10 @@
 # Simulates an active player to check the pace of the economy (python3 tools/balance-sim.py).
 # Reads the rarities, variants and packs from src/shared/Config.luau, then plays N runs:
-# the player always buys the most expensive pack they can afford, keeps the best cards on the
-# stands and sells the rest. Prints, for each pack, when it is first bought (median, fast 10%, slow 10%).
+# the player spends half of their income on the best pack they have unlocked, keeps the best
+# cards on the stands and sells the rest, and saves the other half to buy the next pack as soon
+# as they can. Prints, for each pack, when it is first bought (median, fast 10%, slow 10%).
 # Not counted: offline income, towers, weather, Index bonus, walking to the Shop or the Sell stand.
+import math
 import random
 import re
 import statistics
@@ -11,14 +13,15 @@ from pathlib import Path
 CONFIG = (Path(__file__).parent.parent / "src/shared/Config.luau").read_text()
 RUNS = 40
 OPEN_TIME = 2.5  # seconds to buy and open one pack
-HORIZON = 40 * 3600
+HORIZON = 60 * 3600
+SPEND = 0.5  # share of the income spent on packs of the current tier
 
 
 def number(name, text=CONFIG):
-    return float(re.search(r"%s = ([\d.]+)" % name, text).group(1))
+    return float(re.search(r"%s = ([\d.]+(?:e\d+)?)" % name, text).group(1))
 
 
-RARITY = {m[0]: float(m[1]) for m in re.findall(r'\{ id = "(\w+)", name = "\w+", order = \d+, color = [^}]*\), cash = ([\d.]+) \}', CONFIG)}
+RARITY = {m[0]: float(m[1]) for m in re.findall(r'\{ id = "(\w+)", name = "[^"]+", order = \d+, color = [^}]*\), cash = ([\d.]+) \}', CONFIG)}
 VARIANTS = [(float(c), float(m)) for c, m in re.findall(r'\{ id = "\w+", name = "\w+", chance = ([\d.]+), cash = ([\d.]+), color', CONFIG)]
 PACKS = []
 for block in re.findall(r"\{\n\t\tid = \"\w+\",\n\t\torder.*?\n\t\},", CONFIG, re.S):
@@ -49,26 +52,46 @@ def pull(pack):
 
 
 def play():
-    cash, time, stands, first = START, 0.0, [], {}
-    while time < HORIZON and len(first) < len(PACKS):
-        income = sum(stands)
-        affordable = [i for i, pack in enumerate(PACKS) if cash >= pack["price"]]
-        if not affordable:
-            time += 1
-            cash += income
-            continue
-        index = affordable[-1]
+    cash, budget, time, stands, first = START, START, 0.0, [], {0: 0.0}
+    tier = 0
+
+    def open_pack(index):
+        nonlocal cash, budget, time
         pack = PACKS[index]
-        first.setdefault(index, time)
-        cash -= pack["price"]
         for _ in range(CARDS):
             stands.append(pull(pack))
             stands.sort(reverse=True)
             if len(stands) > STANDS:
-                card = stands.pop()
-                cash += pack["price"] / CARDS * SELL_RATIO * card / pack["average"]
+                money = pack["price"] / CARDS * SELL_RATIO * stands.pop() / pack["average"]
+                cash += money
+                budget += money
+        income = sum(stands)
         time += OPEN_TIME
         cash += income * OPEN_TIME
+        budget += income * SPEND * OPEN_TIME
+
+    cash -= PACKS[0]["price"]
+    budget -= PACKS[0]["price"]
+    open_pack(0)
+    while time < HORIZON and tier < len(PACKS) - 1:
+        income = sum(stands)
+        if cash >= PACKS[tier + 1]["price"]:
+            tier += 1
+            first[tier] = time
+            cash -= PACKS[tier]["price"]
+            budget = min(budget, cash)
+            open_pack(tier)
+        elif budget >= PACKS[tier]["price"] and cash >= PACKS[tier]["price"]:
+            cash -= PACKS[tier]["price"]
+            budget -= PACKS[tier]["price"]
+            open_pack(tier)
+        else:
+            # Nothing to buy yet: skip ahead to the next purchase
+            wait = min((PACKS[tier]["price"] - budget) / (income * SPEND), (PACKS[tier + 1]["price"] - cash) / income)
+            wait = max(1.0, math.ceil(wait))
+            time += wait
+            cash += income * wait
+            budget += income * SPEND * wait
     return first
 
 

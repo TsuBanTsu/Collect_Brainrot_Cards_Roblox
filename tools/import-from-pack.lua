@@ -3,47 +3,14 @@
 --   1. insert the pack from the Toolbox (it lands in Workspace as "BrainrotPack"),
 --   2. paste this whole file into the command bar (View > Command Bar) and press Enter,
 --   3. save the place (Ctrl+S).
--- The models of the pack's "Normal" folder are copied into ServerStorage > AssetLibrary under
--- the card ids, without scripts, particles or animations. The pack is then deleted from Workspace.
+-- (If the pack isn't in Workspace, the script tries to load it by itself.)
+-- The model of every card (Config: card `model`, e.g. "Lava/Lava Tung Sahur") is copied into
+-- ServerStorage > AssetLibrary under the card id, without scripts, particles or animations.
+-- The pack is then deleted from Workspace.
 
-local PACK_TO_CARD = {
-	-- [card id] = exact model name in BrainrotPack > Normal (Noobini Pizzanini isn't in the pack)
-	lirili = "Lirili Larila",
-	timcheese = "Tim Cheese",
-	fluriflura = "Fluri Flura",
-	pipikiwi = "Pipi Kiwi",
-	trippi = "Trippi Troppi",
-	boneca = "Boneca Ambalabu",
-	talpa = "Talpa Di Fero",
-	svinino = "Svinina Bombardino",
-	patapim = "Brr Brr Patapim",
-	bananita = "Bananita Dolphinita",
-	chimpanzini = "Chimpanzini Bananini",
-	ballerina = "Ballerina Cappuccina",
-	tralalero = "Tralalero Tralala",
-	trictrac = "Tric Trac Barabum",
-	rhino = "Rhino Toasterino",
-	cappuccino = "Cappuccino Assassino",
-	burbaloni = "Burbaloni Luliloli",
-	orangutini = "Orangutini Ananassini",
-	tungtung = "Tung Sahur",
-	odin = "Odin Din Din Dun",
-	matteo = "Matteo",
-	bombombini = "Bombombini Gusini",
-	girafa = "Girafa Celeste",
-	frigo = "Frigo Camelo",
-	cocofanto = "Cocofanto Elefanto",
-	bombardiro = "Bombardiro Crocodilo",
-	gangster = "Gangster Footera",
-	lavaca = "La Vacca Saturno Saturnita",
-	glorbo = "Glorbo Fruttodrillo",
-	blueberrinni = "Blueberrinni Octopusini",
-	espresso = "Espresso Signora",
-	chicleteira = "Chicleteira Bicicleteira",
-	tralaleritos = "Los Tralaleritos",
-	garama = "Garamararam",
-	strawberry = "Strawberry Elephant",
-}
+-- The model of each card is listed in Config (card `model` = "Folder/Model name")
+local Config = require(game.ReplicatedStorage.Shared.Config)
+local PACK_ASSET_ID = 137461628889541
 
 local library = game.ServerStorage:FindFirstChild("AssetLibrary")
 if not library then
@@ -86,22 +53,40 @@ for _, child in workspace:GetChildren() do
 		table.insert(packs, child)
 	end
 end
-local normal
-for _, pack in packs do
-	-- A pack inserted twice and emptied by hand leaves an empty "Normal": take one with models
-	local folder = pack:FindFirstChild("Normal")
-	if folder and #folder:GetChildren() > 0 then
-		normal = folder
+-- Not inserted by hand: load it straight from the Creator Store
+if #packs == 0 then
+	local ok, loaded = pcall(function()
+		return game:GetService("InsertService"):LoadAsset(PACK_ASSET_ID)
+	end)
+	if ok and loaded then
+		for _, child in loaded:GetChildren() do
+			if child.Name == "BrainrotPack" or child:FindFirstChild("Normal") then
+				table.insert(packs, child)
+			end
+		end
+		table.insert(packs, loaded)
 	end
 end
-if not normal then
-	warn("[Pack] No BrainrotPack > Normal in Workspace: insert the pack from the Toolbox first.")
+local function findModel(path: string): Instance?
+	local folderName, modelName = string.match(path, "^([^/]+)/(.+)$")
+	for _, pack in packs do
+		-- A pack inserted twice and emptied by hand leaves empty folders: take one with models
+		local folder = pack:FindFirstChild(folderName :: string)
+		local model = folder and folder:FindFirstChild(modelName :: string)
+		if model then
+			return model
+		end
+	end
+	return nil
+end
+if #packs == 0 then
+	warn("[Pack] No BrainrotPack: insert it from the Toolbox (" .. PACK_ASSET_ID .. ") and run this again.")
 	return
 end
 
 local replaced, missing = 0, {}
-for cardId, modelName in PACK_TO_CARD do
-	local source = normal:FindFirstChild(modelName)
+for cardId, card in Config.CARDS do
+	local source = if card.model then findModel(card.model) else nil
 	if source then
 		local copy = source:Clone()
 		if not copy:IsA("Model") then
@@ -117,8 +102,8 @@ for cardId, modelName in PACK_TO_CARD do
 		end
 		copy.Parent = library
 		replaced += 1
-	else
-		table.insert(missing, cardId .. " (" .. modelName .. ")")
+	elseif card.model then
+		table.insert(missing, cardId .. " (" .. card.model .. ")")
 	end
 end
 for _, pack in packs do
