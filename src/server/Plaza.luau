@@ -375,7 +375,8 @@ local function buildStation(station: Station)
 		local tag = Instance.new("BillboardGui")
 		tag.Size = UDim2.fromScale(8, 2)
 		tag.LightInfluence = 0
-		tag.MaxDistance = 60
+		tag.MaxDistance = 45
+		tag.AlwaysOnTop = true -- the awning would hide it when the camera looks down
 		tag.Parent = anchor
 		label(tag, { Size = UDim2.fromScale(1, 0.55), Text = if card then card.name else keeper.card })
 		label(tag, { Position = UDim2.fromScale(0, 0.55), Size = UDim2.fromScale(1, 0.45), Text = keeper.title, TextColor3 = station.color })
