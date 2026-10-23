@@ -286,8 +286,13 @@ end
 ---------------------------------------------------------------------------
 -- Stations
 ---------------------------------------------------------------------------
--- A round stool: a seat in the station's color on 4 wooden legs, `height` studs tall
+-- A stool `height` studs tall: the Creator Store bar stool, or else a seat in the station's
+-- color on 4 wooden legs
 local function buildStool(parent: Instance, base: CFrame, height: number, diameter: number, color: Color3)
+	local _, yaw = base:ToOrientation()
+	if Assets.place("decor_stool", parent, base.Position, yaw, height) then
+		return
+	end
 	local seat = 0.5
 	part({ Name = "StoolSeat", Shape = Enum.PartType.Cylinder, Size = Vector3.new(seat, diameter, diameter), CFrame = base * CFrame.new(0, height - seat / 2, 0) * CFrame.Angles(0, 0, math.rad(90)), Color = color, Material = Enum.Material.SmoothPlastic, Parent = parent })
 	for i = 0, 3 do
