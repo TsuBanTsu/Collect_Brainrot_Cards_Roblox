@@ -24,7 +24,7 @@ local MODEL_MAX_WIDTH = 7 -- and wider ones so they don't reach the next stand (
 local CARD_SIZE = Vector3.new(4.6, 6.4, 0.12) -- the card standing at the back of the pedestal
 local FONT = Enum.Font.FredokaOne
 
-type Stand = { base: BasePart, ring: BasePart, light: PointLight, display: Model, key: string?, color: Color3, lift: number }
+type Stand = { base: BasePart, ring: BasePart, light: PointLight, display: Model, lock: BillboardGui, key: string?, color: Color3, lift: number }
 type Plot = { index: number, cframe: CFrame, model: Model, owner: Player?, stands: { Stand }, sign: TextLabel, income: TextLabel }
 
 local plots: { Plot } = {}
@@ -116,7 +116,17 @@ local function buildStand(plotModel: Model, cframe: CFrame, color: Color3, lift:
 	local display = Instance.new("Model")
 	display.Name = "Display"
 	display.Parent = plotModel
-	return { base = base, ring = ring, light = light, display = display, key = nil, color = color, lift = lift }
+	-- Shown on stands the owner hasn't unlocked yet (upgrade tree: Stand Builder)
+	local lock = Instance.new("BillboardGui")
+	lock.Size = UDim2.fromScale(5, 1.6)
+	lock.StudsOffsetWorldSpace = Vector3.new(0, 2.5, 0)
+	lock.MaxDistance = 50
+	lock.LightInfluence = 0
+	lock.Enabled = false
+	lock.Adornee = base
+	lock.Parent = plotModel
+	label(lock, { Size = UDim2.fromScale(1, 1), Text = "🔒 UPGRADES", TextColor3 = Color3.fromRGB(220, 220, 230) })
+	return { base = base, ring = ring, light = light, display = display, lock = lock, key = nil, color = color, lift = lift }
 end
 
 local function buildPlot(index: number): Plot
@@ -192,15 +202,15 @@ local function buildPlot(index: number): Plot
 		incomeStroke.Thickness = 4
 	end
 
-	-- Two rows of stands
+	-- Three rows of 4 stands (the last ones are unlocked in the upgrade tree)
 	local stands = {}
-	local perRow = math.ceil(Config.STAND_COUNT / 2)
+	local perRow = 4
 	for slot = 1, Config.STAND_COUNT do
-		local row = if slot <= perRow then 0 else 1
+		local row = (slot - 1) // perRow
 		local column = (slot - 1) % perRow
 		local x = (column - (perRow - 1) / 2) * 10
-		local z = -6 + row * 13
-		-- The back row's labels float a bit higher, so they don't sit behind the front row's
+		local z = -10 + row * 10.5
+		-- The back rows' labels float a bit higher, so they don't sit behind the front row's
 		stands[slot] = buildStand(model, cframe * CFrame.new(x, 0.6, z), color, row * 2)
 	end
 
@@ -390,17 +400,19 @@ function Plots.release(player: Player)
 	plot.income.Text = ""
 	for _, stand in plot.stands do
 		setStand(stand, nil)
+		stand.lock.Enabled = false
 	end
 end
 
--- Shows the player's stands as saved in their profile
-function Plots.refresh(player: Player, stands: { [string]: string })
+-- Shows the player's stands as saved in their profile; stands past `unlocked` show a lock
+function Plots.refresh(player: Player, stands: { [string]: string }, unlocked: number)
 	local plot = plotOf(player)
 	if not plot then
 		return
 	end
 	for slot, stand in plot.stands do
 		setStand(stand, stands[tostring(slot)])
+		stand.lock.Enabled = slot > unlocked
 	end
 end
 

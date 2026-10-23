@@ -604,8 +604,9 @@ end)
 okButton.Activated:Connect(cleanup)
 
 ---------------------------------------------------------------------------
--- Autoplay: the fight runs in the background and a small box on the right of the screen
--- follows it (floor, HP, rewards). The player keeps playing meanwhile.
+-- Autoplay: the fight runs in the background and a small button with two swords on the right
+-- of the screen shows the current floor. Tapping it opens a box with the details (HP,
+-- rewards) and the STOP button. The player keeps playing meanwhile.
 ---------------------------------------------------------------------------
 local autoGui = create("ScreenGui", { Name = "TowerAuto", ResetOnSpawn = false, IgnoreGuiInset = true, Enabled = false, DisplayOrder = 2, Parent = player:WaitForChild("PlayerGui") })
 local autoScreen = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = autoGui })
@@ -617,7 +618,16 @@ end
 hudScale:GetPropertyChangedSignal("Scale"):Connect(updateAutoScale)
 updateAutoScale()
 
-local autoBox = create("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.45, 0), Size = UDim2.fromOffset(250, 176), BackgroundColor3 = DARK, BackgroundTransparency = 0.15, Parent = autoScreen }, {
+local autoButton = create("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.47, 0), Size = UDim2.fromOffset(84, 84), BackgroundColor3 = Color3.fromRGB(230, 70, 80), Text = "", Parent = autoScreen }, {
+	create("UICorner", { CornerRadius = UDim.new(0, 16) }),
+	create("UIStroke", { Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+	create("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 120, 120), Color3.fromRGB(170, 40, 60)) }),
+})
+textLabel({ Position = UDim2.fromOffset(0, 4), Size = UDim2.new(1, 0, 0, 44), Text = "⚔", Parent = autoButton })
+local autoButtonFloor = textLabel({ Position = UDim2.new(0, 4, 1, -32), Size = UDim2.new(1, -8, 0, 28), Text = "", Parent = autoButton })
+local autoButtonScale = create("UIScale", { Parent = autoButton })
+
+local autoBox = create("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -108, 0.47, 0), Size = UDim2.fromOffset(250, 176), BackgroundColor3 = DARK, BackgroundTransparency = 0.15, Visible = false, Parent = autoScreen }, {
 	create("UICorner", { CornerRadius = UDim.new(0, 12) }),
 	create("UIStroke", { Thickness = 2.5 }),
 })
@@ -651,6 +661,9 @@ local autoStop = create("TextButton", {
 	TextScaled = true,
 	Parent = autoBox,
 }, { create("UICorner", { CornerRadius = UDim.new(0, 10) }), create("UIStroke", { Thickness = 2.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }), create("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6) }) })
+autoButton.Activated:Connect(function()
+	autoBox.Visible = not autoBox.Visible
+end)
 autoStop.Activated:Connect(function()
 	remotes.LeaveTower:FireServer()
 	autoStop.Text = "STOPPING..."
@@ -697,6 +710,7 @@ local autoHandlers = {
 		autoTitle.Text = "AUTO: " .. newTower.name
 		autoTitle.TextColor3 = newTower.color
 		autoFloor.Text = "Climb " .. autoTotal.runs .. "  ·  starting..."
+		autoButtonFloor.Text = "1"
 		enemyName.Text = ""
 		enemyFill.Size = UDim2.fromScale(1, 1)
 		autoStop.Text = "STOP AUTO"
@@ -708,6 +722,10 @@ local autoHandlers = {
 		local kind = Config.FLOOR_KINDS[event.kind]
 		local floors = if autoTower and autoTower.floors then "/" .. autoTower.floors else ""
 		autoFloor.Text = "Climb " .. autoTotal.runs .. "  ·  Floor " .. event.floor .. floors
+		autoButtonFloor.Text = tostring(event.floor)
+		-- A little bump on each new floor
+		autoButtonScale.Scale = 1.15
+		TweenService:Create(autoButtonScale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 		local enemyCard = Config.CARDS[event.enemy.cardId]
 		enemyName.Text = (if event.kind ~= "normal" then kind.name .. ": " else "") .. (if enemyCard then enemyCard.name else "?")
 		enemyName.TextColor3 = if event.kind == "normal" then Color3.new(1, 1, 1) else RED
@@ -737,6 +755,7 @@ local autoHandlers = {
 	end,
 	autoStop = function()
 		autoGui.Enabled = false
+		autoBox.Visible = false
 		autoTower = nil
 	end,
 }

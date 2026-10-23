@@ -22,14 +22,18 @@ local function average(scores: { number }): number
 	return total / #scores
 end
 
-local function rollGrade(): Config.Grade
+-- `bonus` (upgrades) multiplies the chances of the grades 8 to 10
+local function rollGrade(bonus: number): Config.Grade
+	local function chance(grade: Config.Grade): number
+		return if grade.grade >= 8 then grade.chance * (1 + bonus) else grade.chance
+	end
 	local total = 0
 	for _, grade in Config.GRADES do
-		total += grade.chance
+		total += chance(grade)
 	end
 	local roll = rng:NextNumber() * total
 	for _, grade in Config.GRADES do
-		roll -= grade.chance
+		roll -= chance(grade)
 		if roll <= 0 then
 			return grade
 		end
@@ -79,7 +83,7 @@ function Grading.grade(player: Player, key: string): (Result?, string?)
 		return nil, "Not enough Cash"
 	end
 
-	local grade = rollGrade()
+	local grade = rollGrade(PlayerData.bonus(profile, "grade"))
 	local newScores = rollScores(table.find(Config.GRADES, grade) :: number)
 	profile.Cash -= cost
 	local kept = oldScores ~= nil and average(newScores) <= average(oldScores)

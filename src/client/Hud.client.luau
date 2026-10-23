@@ -30,7 +30,8 @@ local CASH_COLOR = Color3.fromRGB(120, 255, 140)
 local GREY = Color3.fromRGB(110, 110, 125)
 
 local refreshTowers: () -> ()
-local profile = { cards = {}, stands = {}, packs = {}, backpackLevel = 0, index = {}, pity = {}, dailyDay = 0, dailyStreak = 0, team = {}, towers = {}, traitRerolls = 0 }
+local profile = { cards = {}, stands = {}, packs = {}, backpackLevel = 0, index = {}, pity = {}, dailyDay = 0, dailyStreak = 0, team = {}, towers = {}, traitRerolls = 0, upgrades = {}, standCount = Config.BASE_STANDS }
+local autoOpen = false -- pack opening: AUTO is on (upgrade tree)
 
 ---------------------------------------------------------------------------
 -- Small helpers to build the UI
@@ -626,6 +627,7 @@ button({ Size = UDim2.fromOffset(210, 56), Text = "OPEN AGAIN", BackgroundColor3
 	openPack(currentPack)
 end).Parent = revealButtons
 button({ Size = UDim2.fromOffset(160, 56), Text = "CLOSE", BackgroundColor3 = RED, ZIndex = 12 }, function()
+	autoOpen = false
 	reveal.Visible = false
 end).Parent = revealButtons
 -- Top right: at the bottom right it sat right on the jump button of phones
@@ -636,6 +638,18 @@ local skipButton = button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.ne
 	end
 end)
 skipButton.Parent = reveal
+-- AUTO (unlocked in the upgrade tree): keeps opening the same pack while there are some left
+local autoButton = button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 0, 128), Size = UDim2.fromOffset(130, 46), Text = "AUTO: OFF", BackgroundColor3 = GREY, ZIndex = 12, Visible = false }, function() end)
+autoButton.Parent = reveal
+autoButton.Activated:Connect(function()
+	autoOpen = not autoOpen
+	local label = autoButton:FindFirstChild("Label") :: TextLabel
+	label.Text = if autoOpen then "AUTO: ON" else "AUTO: OFF"
+	setButtonColor(autoButton, if autoOpen then Color3.fromRGB(80, 200, 255) else GREY)
+	if autoOpen and not opening and reveal.Visible then
+		task.spawn(openPack, currentPack)
+	end
+end)
 
 local CARD_SIZE = UDim2.fromOffset(200, 280)
 local CARD_PANEL = Color3.fromRGB(35, 30, 55)
@@ -752,6 +766,14 @@ local function screenShake(duration: number, strength: number)
 	end)
 end
 
+-- Upgrade tree: openings play faster (Quick Hands...)
+local function openSpeed(): number
+	return 1 + Config.upgradeBonus(profile.upgrades, "openSpeed")
+end
+local function pause(seconds: number)
+	task.wait(seconds / openSpeed())
+end
+
 local function showPull(slot: Frame, pull)
 	local holder = slot:FindFirstChild("Holder") :: Frame
 	local back = holder:FindFirstChild("Back") :: Frame
@@ -768,7 +790,7 @@ local function showPull(slot: Frame, pull)
 	-- Very rare pulls: the screen goes dark for a moment before the flip
 	if not skipping and pull.oneIn >= 10000 then
 		TweenService:Create(reveal, TweenInfo.new(0.4), { BackgroundTransparency = 0.02 }):Play()
-		task.wait(0.8)
+		pause(0.8)
 	end
 
 	-- Flip: shrink the back to nothing, then grow the real card
@@ -794,9 +816,9 @@ local function showPull(slot: Frame, pull)
 	task.spawn(function()
 		while glow.Parent do
 			TweenService:Create(glowScale, TweenInfo.new(0.8, Enum.EasingStyle.Sine), { Scale = 1.1 }):Play()
-			task.wait(0.8)
+			pause(0.8)
 			TweenService:Create(glowScale, TweenInfo.new(0.8, Enum.EasingStyle.Sine), { Scale = 1.03 }):Play()
-			task.wait(0.8)
+			pause(0.8)
 		end
 	end)
 
@@ -867,7 +889,7 @@ local function tearPack(pack: Config.Pack)
 			task.wait(1 / 30)
 		end
 	end)
-	task.delay(4, function()
+	task.delay(if autoOpen then 0.3 else 4 / openSpeed(), function()
 		event:Fire()
 	end)
 	if not skipping then
@@ -884,7 +906,7 @@ local function tearPack(pack: Config.Pack)
 		-- The pack swells, then bursts open in a flash
 		local swell = create("UIScale", { Parent = packStage })
 		TweenService:Create(swell, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Scale = 1.15 }):Play()
-		task.wait(0.18)
+		pause(0.18)
 		sfx("tear")
 		local flash = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.3, ZIndex = 30, Parent = root })
 		TweenService:Create(flash, TweenInfo.new(0.4), { BackgroundTransparency = 1 }):Play()
@@ -900,9 +922,9 @@ local function tearPack(pack: Config.Pack)
 		end
 		local top = art:FindFirstChild("Top") :: Frame
 		TweenService:Create(top, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.new(0.3, 0, -0.6, 0), Rotation = -35 }):Play()
-		task.wait(0.25)
+		pause(0.25)
 		TweenService:Create(packStage, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.fromScale(0.5, 1.4) }):Play()
-		task.wait(0.2)
+		pause(0.2)
 	end
 	task.delay(0.4, function()
 		clearList(packStage)
@@ -936,6 +958,7 @@ openPack = function(packId: string)
 	reveal.BackgroundTransparency = 0.2
 	reveal.Visible = true
 	skipButton.Visible = true
+	autoButton.Visible = Config.upgradeBonus(profile.upgrades, "autoOpen") > 0
 
 	tearPack(pack)
 
@@ -951,7 +974,7 @@ openPack = function(packId: string)
 		TweenService:Create(holder, TweenInfo.new(if skipping then 0.01 else 0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0), Size = CARD_SIZE, Rotation = 0 }):Play()
 		slots[index] = slot
 		if not skipping then
-			task.wait(0.12)
+			pause(0.12)
 		end
 	end
 	-- Rarest card last, for suspense
@@ -962,16 +985,29 @@ openPack = function(packId: string)
 	table.sort(order, function(a, b)
 		return pulls[a].oneIn < pulls[b].oneIn
 	end)
-	task.wait(if skipping then 0.05 else 0.5)
+	pause(if skipping then 0.05 else 0.5)
 	for _, index in order do
 		showPull(slots[index], pulls[index])
 		if not skipping then
-			task.wait(if pulls[index].oneIn >= 1000 then 1 else 0.45)
+			pause(if pulls[index].oneIn >= 1000 then 1 else 0.45)
 		end
 	end
 	skipButton.Visible = false
 	revealButtons.Visible = true
 	opening = false
+	if autoOpen then
+		task.wait(0.8)
+		if autoOpen and reveal.Visible and not opening then
+			if (profile.packs[packId] or 0) > 0 then
+				task.spawn(openPack, packId)
+			else
+				autoOpen = false
+				local label = autoButton:FindFirstChild("Label") :: TextLabel
+				label.Text = "AUTO: OFF"
+				setButtonColor(autoButton, GREY)
+			end
+		end
+	end
 end
 
 -- While a pack opens, the top bar steps aside; while any window is open, the shopkeepers'
@@ -1095,7 +1131,7 @@ local function refreshCards()
 			inBackpack += count
 		end
 	end
-	backpackTitle.Text = string.format("Backpack %d/%d (cards and packs)", inBackpack, Config.backpackSize(profile.backpackLevel or 0))
+	backpackTitle.Text = string.format("Backpack %d/%d (cards and packs)", inBackpack, player:GetAttribute("BackpackSize") or Config.backpackSize(profile.backpackLevel or 0))
 	local keys = sortedKeys(profile.cards)
 	-- Every card is a little 3D scene: only rebuild the grid when the cards really changed
 	local signature = {}
@@ -1138,7 +1174,7 @@ local function refreshCards()
 
 	clearList(standsList)
 	local used = 0
-	for slot = 1, Config.STAND_COUNT do
+	for slot = 1, profile.standCount or Config.BASE_STANDS do
 		local key = profile.stands[tostring(slot)]
 		if key then
 			used += 1
@@ -1154,7 +1190,7 @@ local function refreshCards()
 			})
 		end
 	end
-	standsTitle.Text = string.format("Stands %d/%d", used, Config.STAND_COUNT)
+	standsTitle.Text = string.format("Stands %d/%d", used, profile.standCount or Config.BASE_STANDS)
 end
 
 ---------------------------------------------------------------------------
@@ -1164,6 +1200,11 @@ local SELL_COLOR = Color3.fromRGB(255, 190, 60)
 local sellPanel = makePanel("Sell", "SELL", SELL_COLOR, Vector2.new(760, 500))
 textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.new(1, -32, 0, 22), Text = "Rarer and shinier cards sell for more. Cards on your stands can't be sold.", TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = sellPanel })
 local sellList = scrollingList({ Position = UDim2.fromOffset(12, 92), Size = UDim2.new(1, -24, 1, -104), Parent = sellPanel })
+
+-- Sell prices with the upgrade tree's bonus
+local function sellBonus(): number
+	return 1 + Config.upgradeBonus(profile.upgrades, "sell")
+end
 
 -- A row with "SELL 1" and "SELL ALL" buttons
 local function sellRow(order: number, title: string, color: Color3, info: string, count: number, onSell: (number) -> ())
@@ -1187,7 +1228,7 @@ local function refreshSell()
 		local count = profile.packs[pack.id] or 0
 		if count > 0 then
 			order += 1
-			sellRow(order, pack.name, pack.color, "$" .. Format.number(Config.packSellPrice(pack.id)) .. " each", count, function(amount)
+			sellRow(order, pack.name, pack.color, "$" .. Format.number(math.floor(Config.packSellPrice(pack.id) * sellBonus())) .. " each", count, function(amount)
 				remotes.SellPack:FireServer(pack.id, amount)
 			end)
 		end
@@ -1198,7 +1239,7 @@ local function refreshSell()
 		local key = keys[i]
 		local cardId, variantId = Config.splitKey(key)
 		order += 1
-		sellRow(order, keyName(key), nameColor(cardId, variantId), "$" .. Format.number(Config.sellPrice(key)) .. " each", profile.cards[key], function(amount)
+		sellRow(order, keyName(key), nameColor(cardId, variantId), "$" .. Format.number(math.floor(Config.sellPrice(key) * sellBonus())) .. " each", profile.cards[key], function(amount)
 			remotes.SellCard:FireServer(key, amount)
 		end)
 	end

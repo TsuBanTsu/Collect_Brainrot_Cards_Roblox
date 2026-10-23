@@ -47,6 +47,7 @@ local function defaultProfile()
 		Team = {}, -- card keys of the tower team (the cards stay where they are)
 		Towers = {}, -- [towerId] = highest floor cleared
 		TraitRerolls = 0,
+		Upgrades = {}, -- [upgradeId] = true (Config.UPGRADES)
 	}
 end
 
@@ -71,9 +72,18 @@ local function reconcile(data)
 			profile.Packs[packId] = nil
 		end
 	end
+	for id in profile.Upgrades do
+		if not Config.UPGRADES[id] then
+			profile.Upgrades[id] = nil
+		end
+	end
 	for slot, key in profile.Stands do
 		local cardId = Config.splitKey(key)
-		if not Config.CARDS[cardId] or (tonumber(slot) or 0) > Config.STAND_COUNT then
+		if not Config.CARDS[cardId] or (tonumber(slot) or 0) > Config.standCount(profile.Upgrades) then
+			-- A card on a stand that no longer exists goes back to the backpack
+			if Config.CARDS[cardId] then
+				profile.Cards[key] = (profile.Cards[key] or 0) + 1
+			end
 			profile.Stands[slot] = nil
 		end
 	end
@@ -137,7 +147,8 @@ function PlayerData.load(player: Player): (any, number)
 	-- Offline income: the stands kept working while the player was away (capped)
 	local offline = 0
 	if profile.LastOnline > 0 then
-		local away = math.clamp(os.time() - profile.LastOnline, 0, Config.OFFLINE_MAX_HOURS * 3600)
+		local hours = Config.OFFLINE_MAX_HOURS + PlayerData.bonus(profile, "offline")
+		local away = math.clamp(os.time() - profile.LastOnline, 0, hours * 3600)
 		offline = math.floor(PlayerData.baseIncome(profile) * away)
 		if offline > 0 then
 			profile.Cash += offline
@@ -169,6 +180,15 @@ function PlayerData.get(player: Player)
 	return profiles[player]
 end
 
+-- Admin panel: starts the player over with a brand new profile
+function PlayerData.reset(player: Player)
+	if profiles[player] then
+		local profile = defaultProfile()
+		profile.LastOnline = os.time()
+		profiles[player] = profile
+	end
+end
+
 ---------------------------------------------------------------------------
 -- Income
 ---------------------------------------------------------------------------
@@ -190,13 +210,22 @@ function PlayerData.completedPacks(profile): number
 	return completed
 end
 
--- Cash per second of the stands with the Index bonus, without weather
+-- Sum of an upgrade stat (Config.UPGRADE_TREES) over the player's upgrades
+function PlayerData.bonus(profile, stat: string): number
+	return Config.upgradeBonus(profile.Upgrades, stat)
+end
+
+function PlayerData.standCount(profile): number
+	return Config.standCount(profile.Upgrades)
+end
+
+-- Cash per second of the stands with the Index and upgrade bonuses, without weather
 function PlayerData.baseIncome(profile): number
 	local total = 0
 	for _, key in profile.Stands do
 		total += Config.keyIncome(key)
 	end
-	return total * Config.indexMultiplier(PlayerData.completedPacks(profile))
+	return total * Config.indexMultiplier(PlayerData.completedPacks(profile)) * (1 + PlayerData.bonus(profile, "cash"))
 end
 
 function PlayerData.addCash(player: Player, amount: number)
@@ -232,7 +261,7 @@ function PlayerData.backpackUsed(profile): number
 end
 
 function PlayerData.backpackSize(profile): number
-	return Config.backpackSize(profile.BackpackLevel)
+	return Config.backpackSize(profile.BackpackLevel) + PlayerData.bonus(profile, "backpack")
 end
 
 -- True if `slots` more items fit in the backpack
@@ -335,6 +364,8 @@ function PlayerData.sync(player: Player)
 		team = PlayerData.validTeam(profile),
 		towers = profile.Towers,
 		traitRerolls = profile.TraitRerolls,
+		upgrades = profile.Upgrades,
+		standCount = PlayerData.standCount(profile),
 	})
 end
 

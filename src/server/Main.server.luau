@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local Admin = require(script.Parent.Admin)
 local Assets = require(script.Parent.Assets)
 local Environment = require(script.Parent.Environment)
 local Grading = require(script.Parent.Grading)
@@ -22,7 +23,7 @@ local Weather = require(script.Parent.Weather)
 ---------------------------------------------------------------------------
 local remotes = Instance.new("Folder")
 remotes.Name = "Remotes"
-for _, name in { "ProfileSync", "RequestSync", "Notify", "Announce", "PlaceCard", "RemoveCard", "PlaceBest", "Fuse", "ClaimDaily", "BuyPack", "UpgradeBackpack", "SellCard", "SellPack", "TowerEvent", "SetTeam", "StartTower", "LeaveTower", "Teleport" } do
+for _, name in { "ProfileSync", "RequestSync", "Notify", "Announce", "PlaceCard", "RemoveCard", "PlaceBest", "Fuse", "ClaimDaily", "BuyPack", "UpgradeBackpack", "SellCard", "SellPack", "TowerEvent", "SetTeam", "StartTower", "LeaveTower", "Teleport", "BuyUpgrade", "BuyAllUpgrades", "AdminAction" } do
 	local remote = Instance.new("RemoteEvent")
 	remote.Name = name
 	remote.Parent = remotes
@@ -57,13 +58,26 @@ Towers.init(remotes, notify, announce)
 local function refreshPlot(player: Player)
 	local profile = PlayerData.get(player)
 	if profile then
-		Plots.refresh(player, profile.Stands)
+		Plots.refresh(player, profile.Stands, PlayerData.standCount(profile))
+	end
+end
+
+-- Walking speed with the upgrades
+local function applyWalkSpeed(player: Player)
+	local profile = PlayerData.get(player)
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if profile and humanoid then
+		humanoid.WalkSpeed = 16 * (1 + PlayerData.bonus(profile, "walk"))
 	end
 end
 
 local function onCharacter(player: Player, character: Model)
 	-- A new character gets an empty backpack: give the pack tools back
 	task.defer(PlayerData.sync, player)
+	task.spawn(function()
+		character:WaitForChild("Humanoid", 5)
+		applyWalkSpeed(player)
+	end)
 	local cframe = Plots.spawnCFrame(player)
 	if cframe then
 		local root = character:WaitForChild("HumanoidRootPart", 5) :: BasePart?
@@ -189,12 +203,12 @@ end)
 ---------------------------------------------------------------------------
 -- Stands
 ---------------------------------------------------------------------------
-local function validSlot(slot: any): boolean
-	return type(slot) == "number" and slot == math.floor(slot) and slot >= 1 and slot <= Config.STAND_COUNT
+local function validSlot(profile, slot: any): boolean
+	return type(slot) == "number" and slot == math.floor(slot) and slot >= 1 and slot <= PlayerData.standCount(profile)
 end
 
 local function firstFreeSlot(profile): number?
-	for slot = 1, Config.STAND_COUNT do
+	for slot = 1, PlayerData.standCount(profile) do
 		if not profile.Stands[tostring(slot)] then
 			return slot
 		end
@@ -232,7 +246,7 @@ remotes.PlaceCard.OnServerEvent:Connect(function(player, key: any, slot: any)
 			return
 		end
 	end
-	if not validSlot(slot) then
+	if not validSlot(profile, slot) then
 		return
 	end
 	if place(profile, key, slot) then
@@ -242,7 +256,7 @@ end)
 
 remotes.RemoveCard.OnServerEvent:Connect(function(player, slot: any)
 	local profile = PlayerData.get(player)
-	if not profile or not validSlot(slot) then
+	if not profile or not validSlot(profile, slot) then
 		return
 	end
 	local key = profile.Stands[tostring(slot)]
@@ -271,14 +285,14 @@ remotes.PlaceBest.OnServerEvent:Connect(function(player)
 	local all = {}
 	for key, count in profile.Cards do
 		local income = Config.keyIncome(key)
-		for _ = 1, math.min(count, Config.STAND_COUNT) do
+		for _ = 1, math.min(count, PlayerData.standCount(profile)) do
 			table.insert(all, { key = key, income = income })
 		end
 	end
 	table.sort(all, function(a, b)
 		return a.income > b.income
 	end)
-	for slot = 1, math.min(#all, Config.STAND_COUNT) do
+	for slot = 1, math.min(#all, PlayerData.standCount(profile)) do
 		place(profile, all[slot].key, slot)
 	end
 	afterStandChange(player)
@@ -326,7 +340,7 @@ remotes.SellCard.OnServerEvent:Connect(function(player, key: any, count: any)
 	if count < 1 or not PlayerData.removeCard(profile, key, count) then
 		return
 	end
-	local price = Config.sellPrice(key) * count
+	local price = math.floor(Config.sellPrice(key) * count * (1 + PlayerData.bonus(profile, "sell")))
 	PlayerData.addCash(player, price)
 	notify(player, "Sold for $" .. Format.number(price))
 	PlayerData.sync(player)
@@ -341,7 +355,7 @@ remotes.SellPack.OnServerEvent:Connect(function(player, packId: any, count: any)
 	if count < 1 or not PlayerData.removePack(profile, packId, count) then
 		return
 	end
-	local price = Config.packSellPrice(packId) * count
+	local price = math.floor(Config.packSellPrice(packId) * count * (1 + PlayerData.bonus(profile, "sell")))
 	PlayerData.addCash(player, price)
 	notify(player, "Sold for $" .. Format.number(price))
 	PlayerData.sync(player)
@@ -421,6 +435,72 @@ remotes.RedeemCode.OnServerInvoke = function(player: Player, code: any)
 	PlayerData.addCash(player, reward.cash)
 	return "Code redeemed: +$" .. Format.number(reward.cash)
 end
+
+---------------------------------------------------------------------------
+-- Upgrade tree (Config.UPGRADE_TREES): bought anywhere with Cash
+---------------------------------------------------------------------------
+-- Buys one node. Returns true if it was bought
+local function buyUpgrade(player: Player, profile, node: Config.Upgrade): boolean
+	if profile.Upgrades[node.id] or (node.requires and not profile.Upgrades[node.requires]) or profile.Cash < node.cost then
+		return false
+	end
+	profile.Cash -= node.cost
+	profile.Upgrades[node.id] = true
+	return true
+end
+
+local function afterUpgrades(player: Player)
+	applyWalkSpeed(player)
+	refreshPlot(player)
+	PlayerData.sync(player)
+end
+
+remotes.BuyUpgrade.OnServerEvent:Connect(function(player, id: any)
+	local profile = PlayerData.get(player)
+	local node = type(id) == "string" and Config.UPGRADES[id]
+	if not profile or not node then
+		return
+	end
+	if node.requires and not profile.Upgrades[node.requires] then
+		notify(player, "Buy " .. Config.UPGRADES[node.requires].name .. " first")
+		return
+	end
+	if not buyUpgrade(player, profile, node) then
+		notify(player, if profile.Upgrades[node.id] then "Already owned" else "Not enough Cash")
+		return
+	end
+	notify(player, node.name .. ": " .. Config.upgradeText(node.stat, node.value) .. "!")
+	afterUpgrades(player)
+end)
+
+-- BUY ALL: the cheapest affordable nodes of a tree, one after the other
+remotes.BuyAllUpgrades.OnServerEvent:Connect(function(player, treeId: any)
+	local profile = PlayerData.get(player)
+	if not profile or type(treeId) ~= "string" then
+		return
+	end
+	local bought = 0
+	while true do
+		local best: Config.Upgrade? = nil
+		for _, node in Config.UPGRADE_LIST do
+			if node.tree == treeId and not profile.Upgrades[node.id] and (not node.requires or profile.Upgrades[node.requires]) and node.cost <= profile.Cash then
+				if not best or node.cost < best.cost then
+					best = node
+				end
+			end
+		end
+		if not best or not buyUpgrade(player, profile, best) then
+			break
+		end
+		bought += 1
+	end
+	notify(player, if bought > 0 then "Bought " .. bought .. " upgrade" .. (if bought > 1 then "s" else "") .. "!" else "Not enough Cash for the next upgrade")
+	if bought > 0 then
+		afterUpgrades(player)
+	end
+end)
+
+Admin.init(remotes, notify, { afterUpgrades = afterUpgrades, announce = announce })
 
 ---------------------------------------------------------------------------
 -- Teleports: the side buttons take the player to their base or to the Pack Shop

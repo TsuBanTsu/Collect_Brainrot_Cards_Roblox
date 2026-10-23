@@ -860,7 +860,10 @@ end
 ---------------------------------------------------------------------------
 -- Stands, Index, pity, offline income
 ---------------------------------------------------------------------------
-Config.STAND_COUNT = 8
+-- Stands built on every plot; a player starts with BASE_STANDS of them and unlocks the others
+-- in the upgrade tree (Stand Builder)
+Config.STAND_COUNT = 12
+Config.BASE_STANDS = 8
 Config.STARTING_CASH = 250 -- enough for 5 Starter Packs
 Config.OFFLINE_MAX_HOURS = 8
 Config.INDEX_BONUS = 0.10 -- +10% cash for each pack fully completed in the Index (normal variants)
@@ -1150,6 +1153,157 @@ Config.DECOR = {
 	decor_register = { id = 3559550517, height = 2.2 },
 	decor_magnifier = { id = 11935186507, size = 3 },
 } :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
+
+---------------------------------------------------------------------------
+-- Upgrade tree: lots of small upgrades bought with Cash, like Collect Cat Cards.
+-- Each tree has branches; a branch is a chain of nodes, each one needs the one before it.
+-- Node i of a branch costs `cost` x `growth`^(i-1) and adds `value` to its stat; every 4th
+-- node is a star and adds twice as much. Stats (all added up, 0 when nothing is bought):
+--   luck, shiny     multiply the chances of rare cards / of Gold, Rainbow, Holo by 1 + bonus
+--   grade           multiplies the chances of the grades 8 to 10 by 1 + bonus
+--   cash, sell      Cash of the stands / sell prices x (1 + bonus)
+--   offline         extra hours of offline income
+--   stands          extra stands (up to STAND_COUNT)
+--   openSpeed       pack openings play faster (x 1 + bonus)
+--   walk            walking speed x (1 + bonus)
+--   backpack        extra backpack slots
+--   towerHp, towerDmg, towerCash   team HP, DMG and the Cash won in the towers x (1 + bonus)
+--   autoOpen        1 = the AUTO button of the pack opening is unlocked
+---------------------------------------------------------------------------
+export type UpgradeBranch = { stat: string, value: number, cost: number, growth: number, names: { string } }
+export type UpgradeTree = { id: string, name: string, icon: string, color: Color3, branches: { UpgradeBranch } }
+export type Upgrade = { id: string, tree: string, branch: number, index: number, name: string, stat: string, value: number, cost: number, star: boolean, requires: string? }
+
+Config.UPGRADE_TREES = {
+	{
+		id = "luck",
+		name = "LUCK",
+		icon = "🍀",
+		color = Color3.fromRGB(80, 210, 90),
+		branches = {
+			{ stat = "luck", value = 0.03, cost = 300, growth = 12, names = { "Four Leaf", "Lucky Charm", "Rabbit Foot", "Horseshoe", "Lucky Star", "Wishbone", "Clover Field", "Lucky Streak", "Jackpot", "Fortune", "Destiny", "Golden Luck" } },
+			{ stat = "shiny", value = 0.03, cost = 500, growth = 12, names = { "Shiny Eye", "Glimmer", "Foil Feel", "Gold Rush", "Sparkle", "Prism Peek", "Rainbow Hunt", "Shine On", "Holo Sense", "Glitter Storm", "Radiance", "Shiny King" } },
+			{ stat = "grade", value = 0.05, cost = 2000, growth = 18, names = { "Keen Eye", "Steady Hand", "Clean Edges", "Sharp Corners", "Centered", "Magnifier", "Flawless", "Mint Touch", "Gem Eye", "Perfect Grade" } },
+		},
+	},
+	{
+		id = "cash",
+		name = "CASH",
+		icon = "💵",
+		color = Color3.fromRGB(255, 200, 60),
+		branches = {
+			{ stat = "cash", value = 0.03, cost = 200, growth = 11, names = { "Tip Jar", "Small Change", "Pay Raise", "Big Tips", "Coin Rush", "Bonus Day", "Overtime", "Gold Tips", "Fat Coins", "Piggy Bank", "Money Rain", "Golden Stand", "Rich Brain", "Cash King" } },
+			{ stat = "sell", value = 0.04, cost = 400, growth = 18, names = { "Sales Pitch", "Haggle", "Good Deal", "Bargain", "Hot Seller", "Market Stall", "Big Sale", "Auction", "Collector", "Trade King" } },
+			{ stat = "offline", value = 0.5, cost = 1000, growth = 15, names = { "Nap Time", "Night Owl", "Soft Pillow", "Cozy Blanket", "Night Shift", "Moon Glow", "Deep Sleep", "Dream On", "Hibernate", "Midnight", "Sleepwalker", "Eternal Rest" } },
+			{ stat = "stands", value = 1, cost = 5000, growth = 1000, names = { "Stand Builder", "Bigger Base", "Stand Tower", "Mega Base" } },
+		},
+	},
+	{
+		id = "speed",
+		name = "SPEED",
+		icon = "⚡",
+		color = Color3.fromRGB(255, 230, 70),
+		branches = {
+			{ stat = "openSpeed", value = 0.06, cost = 150, growth = 15, names = { "Quick Hands", "Fast Rip", "Snap Rip", "Swift Swipe", "Flick Flick", "Tear Time", "Pack Pinch", "Speedy Paws", "Whirl Wrist", "Instant Open" } },
+			{ stat = "walk", value = 0.03, cost = 100, growth = 20, names = { "Fast Feet", "Jog", "Sprint", "Light Step", "Rush", "Dash", "Zoom", "Lightning Legs" } },
+			{ stat = "backpack", value = 10, cost = 800, growth = 20, names = { "Bigger Bag", "Extra Pocket", "Stack It", "Big Pockets", "Satchel", "Stock Room", "Warehouse", "Mega Bag" } },
+		},
+	},
+	{
+		id = "power",
+		name = "POWER",
+		icon = "⚔",
+		color = Color3.fromRGB(255, 80, 90),
+		branches = {
+			{ stat = "towerHp", value = 0.04, cost = 500, growth = 13, names = { "Thick Skin", "Warm Coat", "Fluffy Tail", "Puff Stuff", "Cloud Coat", "Iron Head", "Stone Wall", "Tank", "Fortress", "Unbreakable", "Titan Hide", "Nine Lives" } },
+			{ stat = "towerDmg", value = 0.04, cost = 500, growth = 13, names = { "Headbutt", "Hard Head", "Sharp Horns", "Pounce", "Tail Whip", "Fury", "Double Bonk", "Razor Skull", "Rampage", "Smash", "Titan Bonk", "Brain Blast" } },
+			{ stat = "towerCash", value = 0.05, cost = 1000, growth = 15, names = { "Loot Sense", "Coin Sniff", "Gold Glint", "Treasure Map", "Chest Hunter", "Boss Hunter", "Loot Lord", "Dragon Hoard", "Gem Sense", "Treasure King" } },
+		},
+	},
+	{
+		id = "auto",
+		name = "AUTO OPEN",
+		icon = "📦",
+		color = Color3.fromRGB(80, 200, 255),
+		branches = {
+			{ stat = "autoOpen", value = 1, cost = 25000, growth = 1, names = { "Auto Open" } },
+		},
+	},
+} :: { UpgradeTree }
+
+Config.UPGRADES = {} :: { [string]: Upgrade }
+Config.UPGRADE_LIST = {} :: { Upgrade } -- in tree, branch and chain order
+for _, tree in Config.UPGRADE_TREES do
+	for branchIndex, branch in tree.branches do
+		local previous: string? = nil
+		for index, name in branch.names do
+			local star = index % 4 == 0
+			local node: Upgrade = {
+				id = tree.id .. "_" .. branchIndex .. "_" .. index,
+				tree = tree.id,
+				branch = branchIndex,
+				index = index,
+				name = name,
+				stat = branch.stat,
+				value = if star then branch.value * 2 else branch.value,
+				cost = math.floor(branch.cost * branch.growth ^ (index - 1)),
+				star = star,
+				requires = previous,
+			}
+			Config.UPGRADES[node.id] = node
+			table.insert(Config.UPGRADE_LIST, node)
+			previous = node.id
+		end
+	end
+end
+
+-- How each stat is written in the UI
+Config.UPGRADE_STATS = {
+	luck = "%s Luck",
+	shiny = "%s Shiny chance",
+	grade = "%s good grades",
+	cash = "%s Cash",
+	sell = "%s sell price",
+	offline = "+%s h offline income",
+	stands = "+%s stand",
+	openSpeed = "%s opening speed",
+	walk = "%s walk speed",
+	backpack = "+%s backpack slots",
+	towerHp = "%s tower HP",
+	towerDmg = "%s tower DMG",
+	towerCash = "%s tower Cash",
+	autoOpen = "Unlocks AUTO opening",
+} :: { [string]: string }
+
+-- Stats that are counts, not percents
+local FLAT_STATS = { offline = true, stands = true, backpack = true, autoOpen = true }
+
+function Config.upgradeText(stat: string, value: number): string
+	local amount = if FLAT_STATS[stat] then tostring(value) else "+" .. tostring(math.floor(value * 100 + 0.5)) .. "%"
+	return string.format(Config.UPGRADE_STATS[stat], amount)
+end
+
+-- Sum of a stat over the owned upgrades ({ [upgradeId] = true })
+function Config.upgradeBonus(owned: { [string]: boolean }?, stat: string): number
+	local total = 0
+	for id in (owned or {}) :: { [string]: boolean } do
+		local node = Config.UPGRADES[id]
+		if node and node.stat == stat then
+			total += node.value
+		end
+	end
+	return total
+end
+
+-- Stands a player can use with these upgrades
+function Config.standCount(owned: { [string]: boolean }?): number
+	return math.min(Config.STAND_COUNT, Config.BASE_STANDS + Config.upgradeBonus(owned, "stands"))
+end
+
+---------------------------------------------------------------------------
+-- Admins: they get the admin panel. The place's owner and anyone testing in Studio always do.
+---------------------------------------------------------------------------
+Config.ADMINS = {} :: { number } -- extra Roblox user ids
 
 ---------------------------------------------------------------------------
 -- Look of the world

@@ -62,10 +62,11 @@ local function reward(player: Player, profile, tower: Config.Tower, floor: numbe
 	local kind = Config.floorKind(floor)
 	local given = { cash = 0, packs = 0, pack = Config.towerPack(tower, floor), card = nil :: string?, reroll = false, first = first }
 
-	given.cash = Config.floorGold(tower, floor)
+	given.cash = Config.floorGold(tower, floor) * (1 + PlayerData.bonus(profile, "towerCash"))
 	if not first then
-		given.cash = math.max(1, math.floor(given.cash * Config.TOWER_RERUN_GOLD))
+		given.cash *= Config.TOWER_RERUN_GOLD
 	end
+	given.cash = math.max(1, math.floor(given.cash))
 
 	if kind.id == "boss" then
 		if first then
@@ -141,9 +142,11 @@ local function climb(player: Player, tower: Config.Tower, team: { string }, run:
 	end
 
 	local fighters: { Fighter } = {}
+	local hpBonus, dmgBonus = 1 + PlayerData.bonus(profile, "towerHp"), 1 + PlayerData.bonus(profile, "towerDmg")
 	for _, key in team do
 		local stats = Config.keyStats(key)
-		table.insert(fighters, { key = key, cardId = (Config.splitKey(key)), hp = stats.hp, maxHp = stats.hp, dmg = stats.dmg })
+		local hp = math.floor(stats.hp * hpBonus)
+		table.insert(fighters, { key = key, cardId = (Config.splitKey(key)), hp = hp, maxHp = hp, dmg = math.floor(stats.dmg * dmgBonus) })
 	end
 	local earned = { cash = 0, packs = 0, rerolls = 0, cards = {} }
 
