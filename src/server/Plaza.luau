@@ -367,6 +367,9 @@ local function buildStation(station: Station)
 		end
 		-- A shrunk brainrot stands on a little stool, so it still shows well above the counter
 		local feet = math.max(FLOOR + 0.6, COUNTER_TOP + KEEPER_SHOWN - size.Y)
+		if feet < FLOOR + 1.6 then
+			feet = FLOOR + 0.6 -- almost tall enough: a stool this low would only look odd
+		end
 		local z = 1.6 + size.Z / 2
 		if feet > FLOOR + 0.6 then
 			buildStool(model, cframe * CFrame.new(0, FLOOR + 0.6, z), feet - FLOOR - 0.6, math.clamp(math.min(size.X, size.Z) + 0.6, 2.5, 4.4), station.color)
