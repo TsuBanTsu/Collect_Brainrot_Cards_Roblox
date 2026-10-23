@@ -776,6 +776,63 @@ openPack = function(packId: string)
 	opening = false
 end
 
+-- Packs in the Roblox backpack (PackTools.luau): click or tap while holding one to open it.
+-- A big OPEN button also shows while a pack is in hand, easier to hit on phones.
+local heldPack: string? = nil
+local openHeld = button({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -110), Size = UDim2.fromOffset(240, 64), Text = "OPEN PACK", BackgroundColor3 = ACCENT, Visible = false }, function()
+	if heldPack then
+		openPack(heldPack)
+	end
+end)
+openHeld.Parent = root
+
+local function watchTool(tool: Instance)
+	local packId = tool:IsA("Tool") and tool:GetAttribute("PackId")
+	if not packId or tool:GetAttribute("Watched") then
+		return
+	end
+	tool:SetAttribute("Watched", true)
+	local t = tool :: Tool
+	t.Activated:Connect(function()
+		openPack(packId)
+	end)
+	t.Equipped:Connect(function()
+		heldPack = packId
+		openHeld.Visible = true
+	end)
+	t.Unequipped:Connect(function()
+		if heldPack == packId then
+			heldPack = nil
+			openHeld.Visible = false
+		end
+	end)
+end
+
+local function watchContainer(container: Instance)
+	for _, child in container:GetChildren() do
+		watchTool(child)
+	end
+	container.ChildAdded:Connect(watchTool)
+end
+
+player.ChildAdded:Connect(function(child)
+	if child:IsA("Backpack") then
+		watchContainer(child)
+	end
+end)
+local backpackFolder = player:FindFirstChildOfClass("Backpack")
+if backpackFolder then
+	watchContainer(backpackFolder)
+end
+player.CharacterAdded:Connect(function(character)
+	heldPack = nil
+	openHeld.Visible = false
+	watchContainer(character)
+end)
+if player.Character then
+	watchContainer(player.Character)
+end
+
 ---------------------------------------------------------------------------
 -- Cards and stands
 ---------------------------------------------------------------------------

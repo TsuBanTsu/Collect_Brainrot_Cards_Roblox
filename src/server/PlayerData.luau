@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local PackTools = require(script.Parent.PackTools)
 
 local PlayerData = {}
 
@@ -321,6 +322,7 @@ function PlayerData.sync(player: Player)
 	player:SetAttribute("CompletedPacks", PlayerData.completedPacks(profile))
 	player:SetAttribute("BackpackUsed", PlayerData.backpackUsed(profile))
 	player:SetAttribute("BackpackSize", PlayerData.backpackSize(profile))
+	PackTools.sync(player, profile.Packs)
 	syncRemote:FireClient(player, {
 		cards = profile.Cards,
 		stands = profile.Stands,

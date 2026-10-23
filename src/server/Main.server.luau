@@ -62,6 +62,8 @@ local function refreshPlot(player: Player)
 end
 
 local function onCharacter(player: Player, character: Model)
+	-- A new character gets an empty backpack: give the pack tools back
+	task.defer(PlayerData.sync, player)
 	local cframe = Plots.spawnCFrame(player)
 	if cframe then
 		local root = character:WaitForChild("HumanoidRootPart", 5) :: BasePart?
