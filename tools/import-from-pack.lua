@@ -9,7 +9,8 @@
 -- The pack is then deleted from Workspace.
 
 -- The model of each card is listed in Config (card `model` = "Folder/Model name")
-local Config = require(game.ReplicatedStorage.Shared.Config)
+-- A fresh copy: Studio keeps an old version of a module that was already required
+local Config = require(game.ReplicatedStorage.Shared.Config:Clone())
 local PACK_ASSET_ID = 137461628889541
 
 local library = game.ServerStorage:FindFirstChild("AssetLibrary")
