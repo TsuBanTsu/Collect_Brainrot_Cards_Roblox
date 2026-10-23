@@ -3,6 +3,7 @@
 --   AmbientSpin   turns slowly on itself (attribute Speed, radians per second)
 --   AmbientOrbit  floats around the middle of the map (attributes Radius, Height, Phase, Speed)
 --   AmbientKeeper a shopkeeper: bounces gently and turns to look at the player when close
+--   AmbientHover  a brainrot on a stand: floats up and down and sways a little (only when near)
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -12,7 +13,8 @@ local LOOK_DISTANCE = 30 -- the shopkeepers look at the player closer than this
 local LOOK_LIMIT = math.rad(70) -- and turn at most this much from facing the plaza
 
 type Entry = { instance: PVInstance, pivot: CFrame, yaw: number, phase: number }
-local entries: { [string]: { [PVInstance]: Entry } } = { AmbientSpin = {}, AmbientOrbit = {}, AmbientKeeper = {} }
+local entries: { [string]: { [PVInstance]: Entry } } = { AmbientSpin = {}, AmbientOrbit = {}, AmbientKeeper = {}, AmbientHover = {} }
+local HOVER_DISTANCE = 120 -- stands farther than this stay still (there can be 48 of them)
 
 for tag, list in entries do
 	local function add(instance: Instance)
@@ -63,5 +65,13 @@ RunService.RenderStepped:Connect(function(dt)
 		entry.yaw += (target - entry.yaw) * math.min(1, dt * 5)
 		local bounce = math.abs(math.sin(t * 2.2 + entry.phase)) * 0.25
 		entry.instance:PivotTo(entry.pivot * CFrame.new(0, bounce, 0) * CFrame.Angles(0, entry.yaw, 0))
+	end
+
+	for _, entry in entries.AmbientHover do
+		if root and (entry.pivot.Position - root.Position).Magnitude > HOVER_DISTANCE then
+			continue
+		end
+		local wave = t * 1.6 + entry.phase
+		entry.instance:PivotTo(entry.pivot * CFrame.new(0, math.sin(wave) * 0.35, 0) * CFrame.Angles(0, math.sin(wave * 0.5) * 0.2, 0))
 	end
 end)

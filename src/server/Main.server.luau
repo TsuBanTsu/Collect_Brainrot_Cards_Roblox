@@ -22,7 +22,7 @@ local Weather = require(script.Parent.Weather)
 ---------------------------------------------------------------------------
 local remotes = Instance.new("Folder")
 remotes.Name = "Remotes"
-for _, name in { "ProfileSync", "RequestSync", "Notify", "Announce", "PlaceCard", "RemoveCard", "PlaceBest", "Fuse", "ClaimDaily", "BuyPack", "UpgradeBackpack", "SellCard", "SellPack", "TowerEvent", "SetTeam", "StartTower", "LeaveTower" } do
+for _, name in { "ProfileSync", "RequestSync", "Notify", "Announce", "PlaceCard", "RemoveCard", "PlaceBest", "Fuse", "ClaimDaily", "BuyPack", "UpgradeBackpack", "SellCard", "SellPack", "TowerEvent", "SetTeam", "StartTower", "LeaveTower", "Teleport" } do
 	local remote = Instance.new("RemoteEvent")
 	remote.Name = name
 	remote.Parent = remotes
@@ -369,7 +369,7 @@ remotes.Grade.OnServerInvoke = function(player: Player, key: any)
 		notify(player, reason or "Could not grade the card")
 		return nil
 	end
-	if result.grade >= 9 then
+	if not result.kept and result.grade >= 9 then
 		local cardId, variantId = Config.splitKey(key)
 		local card = Config.CARDS[cardId]
 		local name = (if variantId == "normal" then "" else Config.VARIANT[variantId].name .. " ") .. card.name
@@ -421,6 +421,29 @@ remotes.RedeemCode.OnServerInvoke = function(player: Player, code: any)
 	PlayerData.addCash(player, reward.cash)
 	return "Code redeemed: +$" .. Format.number(reward.cash)
 end
+
+---------------------------------------------------------------------------
+-- Teleports: the side buttons take the player to their base or to the Pack Shop
+---------------------------------------------------------------------------
+local lastTeleport: { [Player]: number } = {}
+
+remotes.Teleport.OnServerEvent:Connect(function(player, target: any)
+	local now = os.clock()
+	if now - (lastTeleport[player] or 0) < 1 or player:GetAttribute("InTower") then
+		return
+	end
+	local goal = if target == "base" then Plots.spawnCFrame(player) elseif target == "shop" then Plaza.teleportCFrame("shop") else nil
+	local character = player.Character
+	if not goal or not character or not character:FindFirstChild("HumanoidRootPart") then
+		return
+	end
+	lastTeleport[player] = now
+	character:PivotTo(goal)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	lastTeleport[player] = nil
+end)
 
 remotes.RequestSync.OnServerEvent:Connect(function(player)
 	PlayerData.sync(player)

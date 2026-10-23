@@ -35,6 +35,7 @@ Plaza.STATIONS = {
 } :: { Station }
 
 local positions: { [string]: Vector3 } = {}
+local standSpots: { [string]: CFrame } = {} -- where a teleported player lands, facing the counter
 local corners: { [string]: { left: Vector3, right: Vector3 } } = {} -- tops of each booth's front pillars
 local folder: Folder
 
@@ -208,6 +209,46 @@ local function buildTree(position: Vector3, sakura: boolean)
 	})
 end
 
+-- A bench players can sit on, facing the way `cframe` looks. The Creator Store model loses its
+-- seats and collisions when it is cleaned up (Assets.luau), so invisible ones are added on it.
+local function buildBench(cframe: CFrame)
+	local _, yaw = cframe:ToOrientation()
+	local position = cframe.Position + Vector3.new(0, FLOOR, 0)
+	local base = CFrame.new(position) * CFrame.Angles(0, yaw, 0)
+	local model = decor("decor_bench", position, yaw)
+	local width, depth, height = 6, 2.4, 3.5
+	if model then
+		local box, size = model:GetBoundingBox()
+		local localSize = (base:Inverse() * box).Rotation:VectorToWorldSpace(size)
+		width, depth, height = math.max(math.abs(localSize.X), math.abs(localSize.Z)), math.min(math.abs(localSize.X), math.abs(localSize.Z)), size.Y
+	else
+		model = Instance.new("Model")
+		model.Name = "Bench"
+		model.Parent = folder
+		local wood = Color3.fromRGB(170, 110, 60)
+		part({ Name = "BenchSeat", Size = Vector3.new(width, 0.4, depth), CFrame = base * CFrame.new(0, 1.6, 0), Color = wood, Material = Enum.Material.SmoothPlastic, Parent = model })
+		part({ Name = "BenchBack", Size = Vector3.new(width, 1.6, 0.3), CFrame = base * CFrame.new(0, 2.6, depth / 2), Color = wood, Material = Enum.Material.SmoothPlastic, Parent = model })
+		for _, x in { -1, 1 } do
+			part({ Name = "BenchLeg", Size = Vector3.new(0.4, 1.4, depth - 0.4), CFrame = base * CFrame.new(x * (width / 2 - 0.4), 0.7, 0), Color = Color3.fromRGB(80, 80, 90), Material = Enum.Material.SmoothPlastic, Parent = model })
+		end
+	end
+	local seatHeight = math.clamp(height * 0.45, 1.2, 2.2)
+	-- A block under the seat so players bump into the bench instead of walking through it
+	part({ Name = "BenchCollider", Size = Vector3.new(width, seatHeight, depth * 0.7), CFrame = base * CFrame.new(0, seatHeight / 2, 0), Transparency = 1, Parent = model })
+	-- Seats: the character sits facing -Z of the seat, so they turn to face the same way as the bench
+	local seats = math.max(1, math.floor(width / 2.6))
+	for i = 1, seats do
+		local x = (i - (seats + 1) / 2) * (width / seats)
+		local seat = Instance.new("Seat")
+		seat.Name = "BenchSeat"
+		seat.Anchored = true
+		seat.Transparency = 1
+		seat.Size = Vector3.new(2, 0.3, 2)
+		seat.CFrame = base * CFrame.new(x, seatHeight + 0.15, -0.1)
+		seat.Parent = model
+	end
+end
+
 local function buildDecoration()
 	buildStatue()
 	buildFloatingCards()
@@ -225,8 +266,7 @@ local function buildDecoration()
 		if i % 2 == 1 and i ~= 1 then -- between the stations (the Towers station takes the bench's place at 90 degrees)
 			local benchDirection = Vector3.new(math.cos(benchAngle), 0, math.sin(benchAngle))
 			local cframe = CFrame.lookAt(benchDirection * (RADIUS - 6), Vector3.zero)
-			local _, yaw = cframe:ToOrientation()
-			decor("decor_bench", cframe.Position + Vector3.new(0, FLOOR, 0), yaw)
+			buildBench(cframe)
 		end
 	end
 	-- Trees between the plots, outside the plaza, with bushes, rocks and flowers at their feet
@@ -310,6 +350,7 @@ local function buildStation(station: Station)
 	local cframe = CFrame.lookAt(position, Vector3.zero)
 	local _, yaw = cframe:ToOrientation()
 	positions[station.id] = position
+	standSpots[station.id] = cframe * CFrame.new(0, FLOOR + 3.5, -7) * CFrame.Angles(0, math.pi, 0)
 
 	local model = Instance.new("Model")
 	model.Name = "Station_" .. station.id
@@ -456,6 +497,11 @@ function Plaza.near(player: Player, stationId: string): boolean
 	end
 	local offset = root.Position - position
 	return Vector3.new(offset.X, 0, offset.Z).Magnitude <= USE_DISTANCE
+end
+
+-- Where a player teleported to a station lands: in front of its counter, facing it
+function Plaza.teleportCFrame(stationId: string): CFrame?
+	return standSpots[stationId]
 end
 
 return Plaza

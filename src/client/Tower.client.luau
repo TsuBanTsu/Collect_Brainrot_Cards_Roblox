@@ -603,9 +603,147 @@ leaveButton.Activated:Connect(function()
 end)
 okButton.Activated:Connect(cleanup)
 
+---------------------------------------------------------------------------
+-- Autoplay: the fight runs in the background and a small box on the right of the screen
+-- follows it (floor, HP, rewards). The player keeps playing meanwhile.
+---------------------------------------------------------------------------
+local autoGui = create("ScreenGui", { Name = "TowerAuto", ResetOnSpawn = false, IgnoreGuiInset = true, Enabled = false, DisplayOrder = 2, Parent = player:WaitForChild("PlayerGui") })
+local autoScreen = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = autoGui })
+local autoScale = create("UIScale", { Parent = autoScreen })
+local function updateAutoScale()
+	autoScale.Scale = hudScale.Scale
+	autoScreen.Size = screen.Size
+end
+hudScale:GetPropertyChangedSignal("Scale"):Connect(updateAutoScale)
+updateAutoScale()
+
+local autoBox = create("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.45, 0), Size = UDim2.fromOffset(250, 176), BackgroundColor3 = DARK, BackgroundTransparency = 0.15, Parent = autoScreen }, {
+	create("UICorner", { CornerRadius = UDim.new(0, 12) }),
+	create("UIStroke", { Thickness = 2.5 }),
+})
+local autoTitle = textLabel({ Position = UDim2.fromOffset(10, 6), Size = UDim2.new(1, -20, 0, 24), Text = "", Parent = autoBox })
+local autoFloor = textLabel({ Position = UDim2.fromOffset(10, 30), Size = UDim2.new(1, -20, 0, 20), Text = "", TextColor3 = Color3.fromRGB(220, 220, 230), Parent = autoBox })
+
+-- A thin HP bar with a name above it
+local function autoBar(y: number, color: Color3): (TextLabel, Frame)
+	local name = textLabel({ Position = UDim2.fromOffset(10, y), Size = UDim2.new(1, -20, 0, 14), Text = "", TextXAlignment = Enum.TextXAlignment.Left, Parent = autoBox })
+	local back = create("Frame", { Position = UDim2.fromOffset(10, y + 15), Size = UDim2.new(1, -20, 0, 7), BackgroundColor3 = Color3.fromRGB(60, 60, 70), BorderSizePixel = 0, Parent = autoBox }, { create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	local fill = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, BorderSizePixel = 0, Parent = back }, { create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	return name, fill
+end
+local enemyName, enemyFill = autoBar(52, RED)
+-- The team: three small bars side by side
+local teamFills: { Frame } = {}
+for i = 1, Config.TEAM_SIZE do
+	local back = create("Frame", { Position = UDim2.new((i - 1) / Config.TEAM_SIZE, 10 - (i - 1) * 6, 0, 92), Size = UDim2.new(1 / Config.TEAM_SIZE, -10, 0, 7), BackgroundColor3 = Color3.fromRGB(60, 60, 70), BorderSizePixel = 0, Parent = autoBox }, { create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	teamFills[i] = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = ACCENT, BorderSizePixel = 0, Parent = back }, { create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+end
+textLabel({ Position = UDim2.fromOffset(10, 76), Size = UDim2.new(1, -20, 0, 14), Text = "Your team", TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = autoBox })
+local autoEarned = textLabel({ Position = UDim2.fromOffset(10, 104), Size = UDim2.new(1, -20, 0, 20), Text = "", TextColor3 = CASH_COLOR, Parent = autoBox })
+local autoStop = create("TextButton", {
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 1, -8),
+	Size = UDim2.fromOffset(150, 36),
+	BackgroundColor3 = RED,
+	Font = FONT,
+	Text = "STOP AUTO",
+	TextColor3 = Color3.new(1, 1, 1),
+	TextScaled = true,
+	Parent = autoBox,
+}, { create("UICorner", { CornerRadius = UDim.new(0, 10) }), create("UIStroke", { Thickness = 2.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }), create("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6) }) })
+autoStop.Activated:Connect(function()
+	remotes.LeaveTower:FireServer()
+	autoStop.Text = "STOPPING..."
+end)
+
+local autoTower: Config.Tower? = nil
+local autoTeam: { { hp: number, maxHp: number } } = {}
+local autoEnemyMax = 1
+local autoTotal = { cash = 0, packs = 0, rerolls = 0, cards = 0, best = 0, runs = 0 }
+
+local function refreshAutoEarned()
+	local parts = { "$" .. Format.number(autoTotal.cash) }
+	if autoTotal.packs > 0 then
+		table.insert(parts, "📦" .. autoTotal.packs)
+	end
+	if autoTotal.rerolls > 0 then
+		table.insert(parts, "🎲" .. autoTotal.rerolls)
+	end
+	if autoTotal.cards > 0 then
+		table.insert(parts, "🃏" .. autoTotal.cards)
+	end
+	autoEarned.Text = "Won: " .. table.concat(parts, "  ")
+end
+
+local function setAutoTeam(fighters)
+	for i, fill in teamFills do
+		local fighter = fighters[i]
+		fill.Parent.Visible = fighter ~= nil
+		if fighter then
+			autoTeam[i] = { hp = fighter.hp, maxHp = fighter.maxHp }
+			fill.Size = UDim2.fromScale(math.clamp(fighter.hp / fighter.maxHp, 0, 1), 1)
+		end
+	end
+end
+
+local autoHandlers = {
+	start = function(event)
+		local newTower = Config.TOWER[event.tower]
+		if autoTower ~= newTower then
+			autoTotal = { cash = 0, packs = 0, rerolls = 0, cards = 0, best = 0, runs = 0 }
+		end
+		autoTower = newTower
+		autoTotal.runs += 1
+		autoTitle.Text = "AUTO: " .. newTower.name
+		autoTitle.TextColor3 = newTower.color
+		autoFloor.Text = "Climb " .. autoTotal.runs .. "  ·  starting..."
+		enemyName.Text = ""
+		enemyFill.Size = UDim2.fromScale(1, 1)
+		autoStop.Text = "STOP AUTO"
+		setAutoTeam(event.team)
+		refreshAutoEarned()
+		autoGui.Enabled = true
+	end,
+	floor = function(event)
+		local kind = Config.FLOOR_KINDS[event.kind]
+		local floors = if autoTower and autoTower.floors then "/" .. autoTower.floors else ""
+		autoFloor.Text = "Climb " .. autoTotal.runs .. "  ·  Floor " .. event.floor .. floors
+		local enemyCard = Config.CARDS[event.enemy.cardId]
+		enemyName.Text = (if event.kind ~= "normal" then kind.name .. ": " else "") .. (if enemyCard then enemyCard.name else "?")
+		enemyName.TextColor3 = if event.kind == "normal" then Color3.new(1, 1, 1) else RED
+		autoEnemyMax = event.enemy.maxHp
+		enemyFill.Size = UDim2.fromScale(1, 1)
+	end,
+	clash = function(event)
+		enemyFill.Size = UDim2.fromScale(math.clamp(event.enemyHp / autoEnemyMax, 0, 1), 1)
+		local fighter = autoTeam[event.fighter]
+		if fighter then
+			fighter.hp = event.hp
+			teamFills[event.fighter].Size = UDim2.fromScale(math.clamp(event.hp / fighter.maxHp, 0, 1), 1)
+		end
+	end,
+	cleared = function(event)
+		local given = event.reward
+		autoTotal.cash += given.cash
+		autoTotal.packs += given.packs
+		autoTotal.rerolls += if given.reroll then 1 else 0
+		autoTotal.cards += if given.card then 1 else 0
+		refreshAutoEarned()
+		setAutoTeam(event.team)
+	end,
+	["end"] = function(event)
+		local text = if event.result == "cleared" then "CLEARED!" elseif event.result == "left" then "Stopped" else "Defeated on floor " .. (event.floor + 1)
+		autoFloor.Text = text .. "  ·  restarting..."
+	end,
+	autoStop = function()
+		autoGui.Enabled = false
+		autoTower = nil
+	end,
+}
+
 local handlers = { start = onStart, floor = onFloor, clash = onClash, cleared = onCleared, ["end"] = onEnd }
 remotes:WaitForChild("TowerEvent").OnClientEvent:Connect(function(event)
-	local handler = handlers[event.type]
+	local handler = if event.auto then autoHandlers[event.type] else handlers[event.type]
 	if handler then
 		task.spawn(handler, event)
 	end

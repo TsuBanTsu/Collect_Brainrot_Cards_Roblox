@@ -14,17 +14,15 @@ local PlayerData = require(script.Parent.PlayerData)
 local Towers = {}
 
 type Fighter = { key: string, cardId: string, hp: number, maxHp: number, dmg: number }
-type Run = { stopped: boolean }
+-- `auto`: the fight runs in the background (no arena, the player keeps playing) and starts
+-- again by itself after each defeat or clear, until the player stops it
+type Run = { stopped: boolean, auto: boolean }
 
 local runs: { [Player]: Run } = {}
 local rng = Random.new()
 local towerEvent: RemoteEvent
 local notify: (Player, string) -> ()
 local announce: (string, Color3) -> ()
-
-local function send(player: Player, event)
-	towerEvent:FireClient(player, event)
-end
 
 -- A random card of a pack; for a boss, one of its rarest cards
 local function enemyCard(packId: string, boss: boolean): string
@@ -134,10 +132,13 @@ local function fighterInfo(fighters: { Fighter })
 	return list
 end
 
-local function runTower(player: Player, tower: Config.Tower, team: { string })
-	local run: Run = { stopped = false }
-	runs[player] = run
+-- One climb of the tower, from floor 1 until defeat, clear or leave. Returns the result.
+local function climb(player: Player, tower: Config.Tower, team: { string }, run: Run): string
 	local profile = PlayerData.get(player)
+	local function send(event)
+		event.auto = run.auto
+		towerEvent:FireClient(player, event)
+	end
 
 	local fighters: { Fighter } = {}
 	for _, key in team do
@@ -146,9 +147,7 @@ local function runTower(player: Player, tower: Config.Tower, team: { string })
 	end
 	local earned = { cash = 0, packs = 0, rerolls = 0, cards = {} }
 
-	player:SetAttribute("InTower", tower.id)
-	freeze(player, true)
-	send(player, { type = "start", tower = tower.id, team = fighterInfo(fighters), best = profile.Towers[tower.id] or 0 })
+	send({ type = "start", tower = tower.id, team = fighterInfo(fighters), best = profile.Towers[tower.id] or 0 })
 	task.wait(Config.TOWER_START_TIME)
 
 	local cleared = 0
@@ -166,7 +165,7 @@ local function runTower(player: Player, tower: Config.Tower, team: { string })
 		local kind = Config.floorKind(floor)
 		local stats = Config.enemyStats(tower, floor)
 		local enemy = { cardId = enemyCard(Config.towerPack(tower, floor), kind.id == "boss"), hp = stats.hp, maxHp = stats.hp, dmg = stats.dmg }
-		send(player, { type = "floor", floor = floor, kind = kind.id, enemy = enemy })
+		send({ type = "floor", floor = floor, kind = kind.id, enemy = enemy })
 		task.wait(Config.TOWER_FLOOR_TIME)
 
 		-- Headbutts: the front card and the enemy hit each other at the same time
@@ -184,7 +183,7 @@ local function runTower(player: Player, tower: Config.Tower, team: { string })
 			local fighter = fighters[index]
 			enemy.hp = math.max(0, enemy.hp - fighter.dmg)
 			fighter.hp = math.max(0, fighter.hp - enemy.dmg)
-			send(player, { type = "clash", fighter = index, dealt = fighter.dmg, taken = enemy.dmg, hp = fighter.hp, enemyHp = enemy.hp })
+			send({ type = "clash", fighter = index, dealt = fighter.dmg, taken = enemy.dmg, hp = fighter.hp, enemyHp = enemy.hp })
 			task.wait(Config.TOWER_CLASH_TIME)
 		end
 		if run.stopped then
@@ -204,7 +203,7 @@ local function runTower(player: Player, tower: Config.Tower, team: { string })
 				fighter.hp = math.min(fighter.maxHp, fighter.hp + math.ceil(fighter.maxHp * heal))
 			end
 		end
-		send(player, { type = "cleared", floor = floor, reward = given, team = fighterInfo(fighters) })
+		send({ type = "cleared", floor = floor, reward = given, team = fighterInfo(fighters) })
 		task.wait(if kind.id == "normal" then Config.TOWER_CLEAR_TIME else Config.TOWER_FLOOR_TIME)
 	end
 
@@ -212,10 +211,45 @@ local function runTower(player: Player, tower: Config.Tower, team: { string })
 		announce(player.DisplayName .. " cleared the " .. tower.name .. "!", tower.color)
 	end
 	if player.Parent then
-		send(player, { type = "end", result = result, floor = cleared, earned = earned })
-		freeze(player, false)
-		player:SetAttribute("InTower", nil)
+		send({ type = "end", result = result, floor = cleared, earned = earned })
 		PlayerData.sync(player)
+	end
+	return result
+end
+
+local function runTower(player: Player, tower: Config.Tower, auto: boolean)
+	local run: Run = { stopped = false, auto = auto }
+	runs[player] = run
+	if auto then
+		player:SetAttribute("TowerAuto", tower.id)
+	else
+		player:SetAttribute("InTower", tower.id)
+		freeze(player, true)
+	end
+	while player.Parent do
+		local profile = PlayerData.get(player)
+		local team = if profile then PlayerData.validTeam(profile) else {}
+		if #team == 0 then
+			break
+		end
+		climb(player, tower, team, run)
+		if not auto or run.stopped then
+			break
+		end
+		-- Autoplay: a short pause, then the next climb (with the team as it is now)
+		task.wait(Config.TOWER_AUTO_RESTART_TIME)
+		if run.stopped then
+			break
+		end
+	end
+	if player.Parent then
+		if auto then
+			player:SetAttribute("TowerAuto", nil)
+			towerEvent:FireClient(player, { type = "autoStop", auto = true })
+		else
+			freeze(player, false)
+			player:SetAttribute("InTower", nil)
+		end
 	end
 	runs[player] = nil
 end
@@ -243,7 +277,8 @@ function Towers.init(remotes: Folder, notifyFn: (Player, string) -> (), announce
 		PlayerData.sync(player)
 	end);
 
-	(remotes:WaitForChild("StartTower") :: RemoteEvent).OnServerEvent:Connect(function(player, towerId: any)
+	-- `auto` true: autoplay in the background (see Run)
+	(remotes:WaitForChild("StartTower") :: RemoteEvent).OnServerEvent:Connect(function(player, towerId: any, auto: any)
 		local profile = PlayerData.get(player)
 		local tower = type(towerId) == "string" and Config.TOWER[towerId]
 		if not profile or not tower or runs[player] then
@@ -258,7 +293,7 @@ function Towers.init(remotes: Folder, notifyFn: (Player, string) -> (), announce
 			notify(player, "Choose your team first")
 			return
 		end
-		task.spawn(runTower, player, tower, team)
+		task.spawn(runTower, player, tower, auto == true)
 	end);
 
 	(remotes:WaitForChild("LeaveTower") :: RemoteEvent).OnServerEvent:Connect(function(player)

@@ -8,6 +8,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
+local SoundService = game:GetService("SoundService")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
@@ -627,7 +628,8 @@ end).Parent = revealButtons
 button({ Size = UDim2.fromOffset(160, 56), Text = "CLOSE", BackgroundColor3 = RED, ZIndex = 12 }, function()
 	reveal.Visible = false
 end).Parent = revealButtons
-local skipButton = button({ AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -30, 0.94, 0), Size = UDim2.fromOffset(130, 50), Text = "SKIP", BackgroundColor3 = GREY, ZIndex = 12, Visible = false }, function()
+-- Top right: at the bottom right it sat right on the jump button of phones
+local skipButton = button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 0, 70), Size = UDim2.fromOffset(130, 50), Text = "SKIP ⏩", BackgroundColor3 = GREY, ZIndex = 12, Visible = false }, function()
 	skipping = true
 	if tapped then
 		tapped:Fire()
@@ -679,6 +681,77 @@ local function shake(target: GuiObject, times: number, angle: number)
 	target.Rotation = 0
 end
 
+-- Built-in Roblox sounds (no upload needed)
+local SOUNDS = {
+	tear = { id = "rbxasset://sounds/swordslash.wav", volume = 0.6, pitch = 1.3 },
+	whoosh = { id = "rbxasset://sounds/swordlunge.wav", volume = 0.35, pitch = 1.4 },
+	flip = { id = "rbxasset://sounds/clickfast.wav", volume = 0.7, pitch = 1 },
+	rare = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.6, pitch = 1 },
+	tick = { id = "rbxasset://sounds/button.wav", volume = 0.4, pitch = 1.6 },
+}
+local soundCache: { [string]: Sound } = {}
+local function sfx(name: string, pitch: number?)
+	local info = SOUNDS[name]
+	local sound = soundCache[name]
+	if not sound then
+		sound = Instance.new("Sound")
+		sound.SoundId = info.id
+		sound.Volume = info.volume
+		sound.Parent = SoundService
+		soundCache[name] = sound
+	end
+	local copy = sound:Clone()
+	copy.PlaybackSpeed = (pitch or 1) * info.pitch
+	copy.Parent = SoundService
+	copy:Play()
+	task.delay(3, function()
+		copy:Destroy()
+	end)
+end
+
+-- Little stars bursting out of a point of `parent` (a pack tearing, a rare card landing)
+local function burst(parent: GuiObject, center: UDim2, color: Color3, amount: number, distance: number)
+	for _ = 1, amount do
+		local angle = math.random() * math.pi * 2
+		local far = distance * (0.5 + math.random() * 0.7)
+		local star = textLabel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = center, Size = UDim2.fromOffset(26, 26), Text = if math.random() < 0.5 then "✦" else "★", TextColor3 = color:Lerp(Color3.new(1, 1, 1), math.random() * 0.5), Rotation = math.random(0, 360), ZIndex = 25, Parent = parent })
+		local goal = center + UDim2.fromOffset(math.cos(angle) * far, math.sin(angle) * far)
+		TweenService:Create(star, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = goal, Rotation = star.Rotation + 180, TextTransparency = 1 }):Play()
+		local outline = star:FindFirstChildOfClass("UIStroke")
+		if outline then
+			TweenService:Create(outline, TweenInfo.new(0.7), { Transparency = 1 }):Play()
+		end
+		task.delay(0.75, function()
+			star:Destroy()
+		end)
+	end
+end
+
+-- Confetti raining over the whole screen (the rarest pulls)
+local function confetti(colors: { Color3 }, amount: number)
+	for i = 1, amount do
+		local piece = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(math.random(), 0, -0.05, 0), Size = UDim2.fromOffset(math.random(10, 18), math.random(6, 10)), Rotation = math.random(0, 360), BackgroundColor3 = colors[(i - 1) % #colors + 1], BorderSizePixel = 0, ZIndex = 28, Parent = reveal })
+		local fall = 1.6 + math.random() * 1.4
+		TweenService:Create(piece, TweenInfo.new(fall, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { Position = UDim2.new(piece.Position.X.Scale + (math.random() - 0.5) * 0.3, 0, 1.08, 0), Rotation = piece.Rotation + math.random(-540, 540) }):Play()
+		task.delay(fall, function()
+			piece:Destroy()
+		end)
+	end
+end
+
+-- The whole reveal shakes for a moment
+local function screenShake(duration: number, strength: number)
+	task.spawn(function()
+		local started = os.clock()
+		while os.clock() - started < duration do
+			local fade = 1 - (os.clock() - started) / duration
+			reveal.Position = UDim2.fromOffset((math.random() - 0.5) * strength * fade, (math.random() - 0.5) * strength * fade)
+			task.wait(1 / 30)
+		end
+		reveal.Position = UDim2.fromOffset(0, 0)
+	end)
+end
+
 local function showPull(slot: Frame, pull)
 	local holder = slot:FindFirstChild("Holder") :: Frame
 	local back = holder:FindFirstChild("Back") :: Frame
@@ -689,6 +762,7 @@ local function showPull(slot: Frame, pull)
 	if not skipping and (rarity.order >= Config.RARITY.epic.order or pull.variant ~= "normal") then
 		TweenService:Create(back, TweenInfo.new(0.3), { BackgroundColor3 = color }):Play()
 		create("UIStroke", { Thickness = 6, Color = color, Transparency = 0.2, Parent = back })
+		sfx("tick", 0.8 + math.min(rarity.order, 10) * 0.08)
 		shake(holder, if pull.oneIn >= 1000 then 14 else 7, if pull.oneIn >= 1000 then 6 else 3)
 	end
 	-- Very rare pulls: the screen goes dark for a moment before the flip
@@ -707,6 +781,35 @@ local function showPull(slot: Frame, pull)
 	end
 	cardFrame(holder, pull.card, pull.variant, UDim2.fromScale(1, 1), 12)
 	TweenService:Create(holder, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = CARD_SIZE }):Play()
+	sfx(if pull.oneIn >= 100 or pull.variant ~= "normal" then "rare" else "flip", if pull.oneIn >= 1000 then 0.8 else 1)
+
+	-- A glow in the card's color behind it, stronger for rarer cards
+	local glowStrength = math.clamp(rarity.order / 8, 0.25, 1)
+	local glow = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(100, 140), Size = UDim2.fromOffset(200, 280), BackgroundTransparency = 1, ZIndex = 11, Parent = slot }, {
+		create("UICorner", { CornerRadius = UDim.new(0.08, 0) }),
+		create("UIStroke", { Thickness = 10, Color = color, Transparency = 1 - glowStrength * 0.8 }),
+	})
+	local glowScale = create("UIScale", { Scale = 0.9, Parent = glow })
+	TweenService:Create(glowScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1.06 }):Play()
+	task.spawn(function()
+		while glow.Parent do
+			TweenService:Create(glowScale, TweenInfo.new(0.8, Enum.EasingStyle.Sine), { Scale = 1.1 }):Play()
+			task.wait(0.8)
+			TweenService:Create(glowScale, TweenInfo.new(0.8, Enum.EasingStyle.Sine), { Scale = 1.03 }):Play()
+			task.wait(0.8)
+		end
+	end)
+
+	-- From Epic up (or shiny): the rarity in big letters over the card, and stars
+	if rarity.order >= Config.RARITY.epic.order or pull.variant ~= "normal" then
+		local callout = if pull.variant ~= "normal" then string.upper(Config.VARIANT[pull.variant].name) .. "!" else string.upper(rarity.name) .. "!"
+		local tag = textLabel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(100, -6), Size = UDim2.fromOffset(240, 40), Text = callout, TextColor3 = color, Rotation = -6, ZIndex = 21, Parent = slot })
+		local tagScale = create("UIScale", { Scale = 2.4, Parent = tag })
+		TweenService:Create(tagScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+		if not skipping then
+			burst(slot, UDim2.fromOffset(100, 140), color, if pull.oneIn >= 1000 then 22 else 12, if pull.oneIn >= 1000 then 260 else 170)
+		end
+	end
 
 	local chance = textLabel({ Position = UDim2.new(0, 0, 1, -48), Size = UDim2.new(1, 0, 0, 34), Text = "1/" .. Format.number(pull.oneIn), TextColor3 = color, ZIndex = 13, Parent = slot })
 	if pull.new then
@@ -725,6 +828,10 @@ local function showPull(slot: Frame, pull)
 			flash:Destroy()
 		end)
 		task.spawn(shake, holder, 8, 4)
+		if not skipping then
+			screenShake(0.5, 18)
+			confetti({ color, rarity.color, Color3.fromRGB(255, 230, 80), Color3.new(1, 1, 1) }, if pull.oneIn >= 10000 then 90 else 50)
+		end
 	end
 	if pull.oneIn >= 10000 then
 		TweenService:Create(reveal, TweenInfo.new(0.6), { BackgroundTransparency = 0.2 }):Play()
@@ -738,6 +845,9 @@ local function tearPack(pack: Config.Pack)
 	packStage.Rotation = 0
 	packStage.Position = UDim2.fromScale(0.5, 0.52)
 	local art = PackArt.build(packStage, pack, 12)
+	-- Light rays in the pack's color turn behind it
+	local packRays = create("Frame", { Name = "Rays", Size = UDim2.fromOffset(200, 280), Position = UDim2.fromOffset(50, 70), BackgroundTransparency = 1, ZIndex = 10, Parent = packStage })
+	rays(packRays, pack.color)
 	local scale = create("UIScale", { Scale = 0.3, Parent = packStage })
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 
@@ -771,6 +881,23 @@ local function tearPack(pack: Config.Pack)
 	scale:Destroy()
 
 	if not skipping then
+		-- The pack swells, then bursts open in a flash
+		local swell = create("UIScale", { Parent = packStage })
+		TweenService:Create(swell, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Scale = 1.15 }):Play()
+		task.wait(0.18)
+		sfx("tear")
+		local flash = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.3, ZIndex = 30, Parent = root })
+		TweenService:Create(flash, TweenInfo.new(0.4), { BackgroundTransparency = 1 }):Play()
+		task.delay(0.4, function()
+			flash:Destroy()
+		end)
+		burst(reveal, UDim2.fromScale(0.5, 0.35), pack.color, 18, 260)
+		screenShake(0.25, 10)
+		TweenService:Create(swell, TweenInfo.new(0.2), { Scale = 1 }):Play()
+		local packRaysNow = packStage:FindFirstChild("Rays")
+		if packRaysNow then
+			packRaysNow:Destroy()
+		end
 		local top = art:FindFirstChild("Top") :: Frame
 		TweenService:Create(top, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.new(0.3, 0, -0.6, 0), Rotation = -35 }):Play()
 		task.wait(0.25)
@@ -816,9 +943,12 @@ openPack = function(packId: string)
 	local slots = {}
 	for index in pulls do
 		local slot = create("Frame", { LayoutOrder = index, Size = UDim2.fromOffset(200, 340), BackgroundTransparency = 1, ZIndex = 11, Parent = revealRow })
-		local holder = create("Frame", { Name = "Holder", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, (2 - index) * 230, 0, 260), Size = UDim2.fromOffset(60, 84), BackgroundTransparency = 1, ZIndex = 12, Parent = slot })
+		local holder = create("Frame", { Name = "Holder", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, (2 - index) * 230, 0, 60), Size = UDim2.fromOffset(60, 84), Rotation = (index - 2) * 40 + 180, BackgroundTransparency = 1, ZIndex = 12, Parent = slot })
 		cardBack(holder, pack)
-		TweenService:Create(holder, TweenInfo.new(if skipping then 0.01 else 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0), Size = CARD_SIZE }):Play()
+		if not skipping then
+			sfx("whoosh", 0.9 + index * 0.1)
+		end
+		TweenService:Create(holder, TweenInfo.new(if skipping then 0.01 else 0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0), Size = CARD_SIZE, Rotation = 0 }):Play()
 		slots[index] = slot
 		if not skipping then
 			task.wait(0.12)
@@ -849,6 +979,8 @@ end
 reveal:GetPropertyChangedSignal("Visible"):Connect(function()
 	statsBar.Visible = not reveal.Visible
 	weatherLabel.Visible = not reveal.Visible
+	-- Phones: the thumbstick and jump button hide while a pack opens, so no tap lands on them
+	GuiService.TouchControlsEnabled = not reveal.Visible
 end)
 local hotbarHidden = false
 task.spawn(function()
@@ -1097,35 +1229,48 @@ local grading = false
 local function refreshGrade()
 	clearList(gradeList)
 	local order = 0
-	for _, key in sortedKeys(profile.cards) do
-		local cardId, variantId, scores = Config.splitKey(key)
-		if not scores then
-			order += 1
-			local cost = Config.gradeCost(cardId, variantId)
-			local row = create("Frame", { LayoutOrder = order, Size = UDim2.new(1, -10, 0, 48), BackgroundColor3 = PANEL, Parent = gradeList }, { corner(8), stroke(1.5) })
-			local count = profile.cards[key]
-			textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -220, 0, 22), Text = keyName(key) .. (if count > 1 then "  x" .. count else ""), TextColor3 = nameColor(cardId, variantId), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-			textLabel({ Position = UDim2.fromOffset(10, 26), Size = UDim2.new(1, -220, 0, 18), Text = "$" .. Format.number(Config.keyIncome(key)) .. "/s", TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-			local canPay = (player:GetAttribute("Cash") or 0) >= cost
-			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(190, 36), Text = "GRADE $" .. Format.number(cost), BackgroundColor3 = if canPay then GRADE_COLOR else GREY }, function()
-				if grading then
-					return
-				end
-				if (player:GetAttribute("Cash") or 0) < cost then
-					toast("Not enough Cash to grade this card", RED)
-					return
-				end
-				grading = true
-				local result = remotes.Grade:InvokeServer(key)
-				if result then
-					showGrade(result)
-				end
-				grading = false
-			end).Parent = row
+	-- Cards not graded yet first, then the graded ones (a reroll keeps the better grade)
+	local keys = sortedKeys(profile.cards)
+	local rank = {}
+	for index, key in keys do
+		rank[key] = index + (if Config.keyGrade(key) then #keys else 0)
+	end
+	table.sort(keys, function(a, b)
+		return rank[a] < rank[b]
+	end)
+	for _, key in keys do
+		local cardId, variantId = Config.splitKey(key)
+		local grade = Config.keyGrade(key)
+		order += 1
+		local cost = if grade then Config.regradeCost(cardId, variantId) else Config.gradeCost(cardId, variantId)
+		local row = create("Frame", { LayoutOrder = order, Size = UDim2.new(1, -10, 0, 48), BackgroundColor3 = PANEL, Parent = gradeList }, { corner(8), stroke(1.5) })
+		local count = profile.cards[key]
+		textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -220, 0, 22), Text = keyName(key) .. (if count > 1 then "  x" .. count else ""), TextColor3 = nameColor(cardId, variantId), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local info = "$" .. Format.number(Config.keyIncome(key)) .. "/s"
+		if grade then
+			info ..= string.format('   <font color="#%s">%s</font>  ·  reroll: keeps the better grade', grade.color:ToHex(), grade.name)
 		end
+		textLabel({ Position = UDim2.fromOffset(10, 26), Size = UDim2.new(1, -220, 0, 18), Text = info, RichText = true, TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local canPay = (player:GetAttribute("Cash") or 0) >= cost
+		local color = if grade then Color3.fromRGB(120, 80, 200) else GRADE_COLOR
+		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(190, 36), Text = (if grade then "REROLL $" else "GRADE $") .. Format.number(cost), BackgroundColor3 = if canPay then color else GREY }, function()
+			if grading then
+				return
+			end
+			if (player:GetAttribute("Cash") or 0) < cost then
+				toast("Not enough Cash to grade this card", RED)
+				return
+			end
+			grading = true
+			local result = remotes.Grade:InvokeServer(key)
+			if result then
+				showGrade(result)
+			end
+			grading = false
+		end).Parent = row
 	end
 	if order == 0 then
-		textLabel({ Size = UDim2.new(1, -10, 0, 30), Text = "No card to grade: graded cards can't be graded again", TextColor3 = GREY, Parent = gradeList })
+		textLabel({ Size = UDim2.new(1, -10, 0, 30), Text = "No card to grade: open some packs first", TextColor3 = GREY, Parent = gradeList })
 	end
 end
 
@@ -1189,6 +1334,12 @@ showGrade = function(result)
 	cardFrame(gradeCardHolder, cardId, variantId, UDim2.fromScale(1, 1), 11, grade, (Config.keyTrait(result.key) or {} :: any).id)
 	gradeResult.Text = string.format("Average %.2f  ·  %s  ·  %s Cash", total / #result.scores, grade.name, Format.multiplier(grade.cash))
 	gradeResult.TextColor3 = grade.color
+	if result.kept then
+		-- A reroll that rolled worse: the card keeps its old grade
+		gradeResult.Text = string.format("Rolled %.2f: worse, your card keeps %s", total / #result.scores, grade.name)
+	elseif result.regrade then
+		gradeResult.Text = "UPGRADED!  " .. gradeResult.Text
+	end
 	local pop = create("UIScale", { Scale = if grade.grade >= 8 then 1.8 else 1.2, Parent = gradeResult })
 	TweenService:Create(pop, TweenInfo.new(0.6, Enum.EasingStyle.Elastic), { Scale = 1 }):Play()
 	gradeClose.Visible = true
@@ -1443,19 +1594,37 @@ refreshTowers = function()
 	for _, tower in Config.TOWERS do
 		local best = (profile.towers or {})[tower.id] or 0
 		local row = create("Frame", { LayoutOrder = tower.order, Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = Color3.new(1, 1, 1), Parent = towerList }, { corner(10), stroke(2), gradient(tower.color:Lerp(DARK, 0.35), tower.color:Lerp(DARK, 0.7)) })
-		textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -130, 0, 26), Text = tower.name, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -200, 0, 26), Text = tower.name, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
 		local floors = if tower.floors then string.format("Best: %d/%d", best, tower.floors) else string.format("Best: floor %d", best)
-		textLabel({ Position = UDim2.fromOffset(10, 31), Size = UDim2.new(1, -130, 0, 19), Text = floors, TextColor3 = Color3.fromRGB(220, 220, 230), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(110, 42), Text = "ENTER", BackgroundColor3 = if #team > 0 then ACCENT else GREY }, function()
+		textLabel({ Position = UDim2.fromOffset(10, 31), Size = UDim2.new(1, -200, 0, 19), Text = floors, TextColor3 = Color3.fromRGB(220, 220, 230), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local autoTower = player:GetAttribute("TowerAuto")
+		local function start(auto: boolean)
 			if #team == 0 then
 				toast("Add cards to your team first", RED)
+				return
+			end
+			if autoTower then
+				toast("Stop the autoplay first", RED)
 				return
 			end
 			for _, panel in panels do
 				panel.Visible = false
 			end
-			remotes.StartTower:FireServer(tower.id)
+			remotes.StartTower:FireServer(tower.id, auto)
+		end
+		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -100, 0.5, 0), Size = UDim2.fromOffset(88, 42), Text = "ENTER", BackgroundColor3 = if #team > 0 and not autoTower then ACCENT else GREY }, function()
+			start(false)
 		end).Parent = row
+		-- Autoplay: fights in the background and climbs again after each defeat
+		if autoTower == tower.id then
+			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(88, 42), Text = "STOP", BackgroundColor3 = RED }, function()
+				remotes.LeaveTower:FireServer()
+			end).Parent = row
+		else
+			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(88, 42), Text = "AUTO", BackgroundColor3 = if #team > 0 and not autoTower then Color3.fromRGB(60, 150, 230) else GREY }, function()
+				start(true)
+			end).Parent = row
+		end
 	end
 end
 
@@ -1479,6 +1648,9 @@ end
 player:GetAttributeChangedSignal("InTower"):Connect(refreshInTower)
 player:GetAttributeChangedSignal("TowerScreen"):Connect(refreshInTower)
 refreshInTower()
+player:GetAttributeChangedSignal("TowerAuto"):Connect(function()
+	refreshTowers()
+end)
 
 ---------------------------------------------------------------------------
 -- Side buttons
@@ -1486,7 +1658,7 @@ refreshInTower()
 local sideBar = create("Frame", {
 	AnchorPoint = Vector2.new(0, 0.5),
 	Position = UDim2.new(0, 14, 0.5, 0),
-	Size = UDim2.fromOffset(150, 300),
+	Size = UDim2.fromOffset(150, 360),
 	BackgroundTransparency = 1,
 	Parent = root,
 }, { create("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }) })
@@ -1496,6 +1668,19 @@ for order, entry in { { "Packs", PACKS_COLOR, "📦" }, { "Cards", CARDS_COLOR, 
 	button({ LayoutOrder = order, Size = UDim2.fromOffset(150, 56), Text = icon .. " " .. string.upper(name), BackgroundColor3 = color }, function()
 		togglePanel(name)
 	end).Parent = sideBar
+end
+
+-- Teleports: two smaller buttons side by side under the others
+local teleportRow = create("Frame", { LayoutOrder = 10, Size = UDim2.fromOffset(150, 46), BackgroundTransparency = 1, Parent = sideBar }, {
+	create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6) }),
+})
+for order, entry in { { "base", "🏠 BASE", Color3.fromRGB(70, 140, 230) }, { "shop", "🛒 SHOP", SHOP_COLOR } } do
+	button({ LayoutOrder = order, Size = UDim2.fromOffset(72, 46), Text = entry[2], BackgroundColor3 = entry[3] }, function()
+		for _, panel in panels do
+			panel.Visible = false
+		end
+		remotes.Teleport:FireServer(entry[1])
+	end).Parent = teleportRow
 end
 
 ---------------------------------------------------------------------------
