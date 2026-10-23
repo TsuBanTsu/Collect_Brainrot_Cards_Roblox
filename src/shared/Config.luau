@@ -639,7 +639,7 @@ Config.ASSETS = {
 } :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
 
 -- The giant statue in the middle of the plaza: one of the card models (Config.ASSETS)
-Config.CENTER_STATUE = { card = "strawberry", height = 20 }
+Config.CENTER_STATUE = { card = "tungtung", height = 20 }
 
 -- Free Creator Store models that decorate the plaza (same loading as the brainrots).
 -- If one is missing, a simple shape built from parts takes its place.
