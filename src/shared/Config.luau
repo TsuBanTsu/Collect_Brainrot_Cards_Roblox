@@ -1104,7 +1104,7 @@ Config.CENTER_STATUE = { card = "strawberry", height = 14 }
 Config.SHOPKEEPERS = {
 	shop = { card = "tralalero", title = "Shopkeeper", height = 6.5 },
 	sell = { card = "bobritobandito", title = "Buyer", height = 6.5 },
-	grade = { card = "noomyexamen", title = "Grader", height = 6.5 },
+	grade = { card = "odin", title = "Grader", height = 6.5 },
 	towers = { card = "bombardiro", title = "Tower Master", height = 6.5 },
 }
 

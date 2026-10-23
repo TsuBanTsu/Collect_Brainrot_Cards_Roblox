@@ -4,7 +4,8 @@
 -- The brainrot and decoration models land in ServerStorage > AssetLibrary, where Assets.luau finds them.
 -- Scripts inside the models are deleted. Running it again only adds the models still missing.
 
-local Config = require(game.ReplicatedStorage.Shared.Config)
+-- A fresh copy: Studio keeps an old version of a module that was already required
+local Config = require(game.ReplicatedStorage.Shared.Config:Clone())
 local library = game.ServerStorage:FindFirstChild("AssetLibrary")
 if not library then
 	library = Instance.new("Folder")
