@@ -163,7 +163,7 @@ function CardArt.build(parent: Instance, cardId: string, variantId: string, grad
 		new("UIStroke", { Thickness = 3, Color = grade.color }, label)
 		text(label, { Position = UDim2.fromScale(0.04, 0.12), Size = UDim2.fromScale(0.66, 0.76), Text = grade.name, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = z + 2 })
 		text(label, { Position = UDim2.fromScale(0.72, 0.02), Size = UDim2.fromScale(0.25, 0.96), Text = tostring(grade.grade), TextColor3 = grade.color, ZIndex = z + 2 })
-		holder = new("Frame", { Position = UDim2.fromScale(0.06, 0.155), Size = UDim2.fromScale(0.88, 0.825), BackgroundTransparency = 1, ZIndex = z }, root)
+		holder = new("Frame", { Position = UDim2.fromScale(0.08, 0.19), Size = UDim2.fromScale(0.84, 0.79), BackgroundTransparency = 1, ZIndex = z }, root)
 		z += 2
 	end
 
@@ -202,7 +202,7 @@ function CardArt.build(parent: Instance, cardId: string, variantId: string, grad
 
 	-- Variants: a colored reflection over the picture
 	if variantId ~= "normal" then
-		local foil = new("Frame", { Name = "Foil", Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BackgroundTransparency = if variantId == "gold" then 0.45 else 0.4, ZIndex = z + 4 }, inner)
+		local foil = new("Frame", { Name = "Foil", Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, BackgroundTransparency = if variantId == "rainbow" then 0.58 else 0.4, ZIndex = z + 4 }, inner)
 		new("UIGradient", { Rotation = 35, Color = CardArt.frameColors(cardId, variantId), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.5, 0.75), NumberSequenceKeypoint.new(1, 0) }) }, foil)
 	end
 

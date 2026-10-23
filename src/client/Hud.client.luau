@@ -11,6 +11,7 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local CardArt = require(ReplicatedStorage.Shared.CardArt)
+local PackArt = require(ReplicatedStorage.Shared.PackArt)
 local Format = require(ReplicatedStorage.Shared.Format)
 
 local player = Players.LocalPlayer
@@ -275,7 +276,7 @@ end)
 
 local weatherLabel = textLabel({
 	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 118),
+	Position = UDim2.new(0.5, 0, 0, 128),
 	Size = UDim2.fromOffset(520, 22),
 	Text = "",
 	Parent = root,
@@ -520,53 +521,128 @@ end
 player:GetAttributeChangedSignal("Cash"):Connect(refreshShop)
 
 ---------------------------------------------------------------------------
--- Pack opening: the cards flip one by one with their "1 in X" chance underneath
+-- Pack opening: the pack shakes until the player taps it, its top tears off, the cards fly
+-- out face down and flip one by one, the rarest last, with their "1 in X" chance underneath.
+-- The rarer the card, the bigger the show: its back glows in its rarity's color before the
+-- flip, light rays turn behind it, the screen flashes.
 ---------------------------------------------------------------------------
 local reveal = create("Frame", {
 	Size = UDim2.fromScale(1, 1),
 	BackgroundColor3 = Color3.new(0, 0, 0),
-	BackgroundTransparency = 0.35,
+	BackgroundTransparency = 0.2,
+	Active = true,
 	Visible = false,
 	ZIndex = 10,
 	Parent = root,
 })
-local revealTitle = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.2, 0), Size = UDim2.fromOffset(600, 44), Text = "", ZIndex = 11, Parent = reveal })
+local revealTitle = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.12, 0), Size = UDim2.fromOffset(600, 44), Text = "", ZIndex = 11, Parent = reveal })
+local revealHint = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.84, 0), Size = UDim2.fromOffset(400, 34), Text = "TAP TO OPEN!", ZIndex = 11, Visible = false, Parent = reveal })
+local packStage = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), Size = UDim2.fromOffset(250, 350), BackgroundTransparency = 1, ZIndex = 11, Parent = reveal })
 local revealRow = create("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.58),
+	Position = UDim2.fromScale(0.5, 0.55),
 	Size = UDim2.fromOffset(760, 360),
 	BackgroundTransparency = 1,
 	ZIndex = 11,
 	Parent = reveal,
 }, { create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 30) }) })
-local revealButtons = create("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0.9, 0), Size = UDim2.fromOffset(440, 56), BackgroundTransparency = 1, Visible = false, ZIndex = 11, Parent = reveal }, {
+local revealButtons = create("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0.94, 0), Size = UDim2.fromOffset(440, 56), BackgroundTransparency = 1, Visible = false, ZIndex = 11, Parent = reveal }, {
 	create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 20) }),
 })
 local currentPack = "starter"
 local opening = false
+local skipping = false
+local tapped: BindableEvent? = nil
 button({ Size = UDim2.fromOffset(210, 56), Text = "OPEN AGAIN", BackgroundColor3 = ACCENT, ZIndex = 12 }, function()
 	openPack(currentPack)
 end).Parent = revealButtons
 button({ Size = UDim2.fromOffset(160, 56), Text = "CLOSE", BackgroundColor3 = RED, ZIndex = 12 }, function()
 	reveal.Visible = false
 end).Parent = revealButtons
+local skipButton = button({ AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -30, 0.94, 0), Size = UDim2.fromOffset(130, 50), Text = "SKIP", BackgroundColor3 = GREY, ZIndex = 12, Visible = false }, function()
+	skipping = true
+	if tapped then
+		tapped:Fire()
+	end
+end)
+skipButton.Parent = reveal
 
 local CARD_SIZE = UDim2.fromOffset(200, 280)
+local CARD_PANEL = Color3.fromRGB(35, 30, 55)
+
+-- The back of a card, like the floating cards of the plaza: pack-colored border, dark panel
+local function cardBack(holder: Frame, pack: Config.Pack): Frame
+	local back = create("Frame", { Name = "Back", Size = UDim2.fromScale(1, 1), BackgroundColor3 = pack.color, ZIndex = 12, Parent = holder }, {
+		create("UICorner", { CornerRadius = UDim.new(0.07, 0) }),
+		stroke(2),
+	})
+	create("Frame", { Position = UDim2.fromScale(0.06, 0.045), Size = UDim2.fromScale(0.88, 0.91), BackgroundColor3 = CARD_PANEL, ZIndex = 13, Parent = back }, {
+		create("UICorner", { CornerRadius = UDim.new(0.07, 0) }),
+		stroke(3, Color3.new(1, 1, 1)),
+		textLabel({ Position = UDim2.fromScale(0.15, 0.18), Size = UDim2.fromScale(0.7, 0.42), Text = "?", TextColor3 = pack.color:Lerp(Color3.new(1, 1, 1), 0.3), ZIndex = 14 }),
+		textLabel({ Position = UDim2.fromScale(0.08, 0.68), Size = UDim2.fromScale(0.84, 0.13), Text = "BRAINROT", ZIndex = 14 }),
+	})
+	return back
+end
+
+-- Light rays turning behind a rare card
+local function rays(slot: Frame, color: Color3)
+	local center = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(100, 140), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, ZIndex = 11, Parent = slot })
+	for i = 1, 6 do
+		create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(46, 460), Rotation = i * 30, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 11, Parent = center }, {
+			create("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.35), NumberSequenceKeypoint.new(1, 1) }) }),
+		})
+	end
+	local scale = create("UIScale", { Scale = 0, Parent = center })
+	TweenService:Create(scale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	task.spawn(function()
+		while center.Parent do
+			center.Rotation += 1
+			task.wait(1 / 30)
+		end
+	end)
+end
+
+local function shake(target: GuiObject, times: number, angle: number)
+	for i = 1, times do
+		target.Rotation = if i % 2 == 0 then angle else -angle
+		task.wait(0.04)
+	end
+	target.Rotation = 0
+end
 
 local function showPull(slot: Frame, pull)
 	local holder = slot:FindFirstChild("Holder") :: Frame
 	local back = holder:FindFirstChild("Back") :: Frame
+	local rarity = Config.RARITY[Config.CARDS[pull.card].rarity]
+	local color = nameColor(pull.card, pull.variant)
+
+	-- Teasing: from Epic up (or any shiny), the back glows in the card's color and shakes
+	if not skipping and (rarity.order >= Config.RARITY.epic.order or pull.variant ~= "normal") then
+		TweenService:Create(back, TweenInfo.new(0.3), { BackgroundColor3 = color }):Play()
+		create("UIStroke", { Thickness = 6, Color = color, Transparency = 0.2, Parent = back })
+		shake(holder, if pull.oneIn >= 1000 then 14 else 7, if pull.oneIn >= 1000 then 6 else 3)
+	end
+	-- Very rare pulls: the screen goes dark for a moment before the flip
+	if not skipping and pull.oneIn >= 10000 then
+		TweenService:Create(reveal, TweenInfo.new(0.4), { BackgroundTransparency = 0.02 }):Play()
+		task.wait(0.8)
+	end
+
 	-- Flip: shrink the back to nothing, then grow the real card
 	local shrink = TweenService:Create(holder, TweenInfo.new(0.15), { Size = UDim2.fromOffset(0, 280) })
 	shrink:Play()
 	shrink.Completed:Wait()
 	back:Destroy()
+	if pull.oneIn >= 100 then
+		rays(slot, color)
+	end
 	cardFrame(holder, pull.card, pull.variant, UDim2.fromScale(1, 1), 12)
-	TweenService:Create(holder, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = CARD_SIZE }):Play()
+	TweenService:Create(holder, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = CARD_SIZE }):Play()
 
-	local chance = textLabel({ Position = UDim2.new(0, 0, 1, -48), Size = UDim2.new(1, 0, 0, 34), Text = "1/" .. Format.number(pull.oneIn), TextColor3 = nameColor(pull.card, pull.variant), ZIndex = 13, Parent = slot })
+	local chance = textLabel({ Position = UDim2.new(0, 0, 1, -48), Size = UDim2.new(1, 0, 0, 34), Text = "1/" .. Format.number(pull.oneIn), TextColor3 = color, ZIndex = 13, Parent = slot })
 	if pull.new then
-		textLabel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 6, 0, -10), Size = UDim2.fromOffset(70, 28), Text = "NEW!", TextColor3 = Color3.fromRGB(255, 230, 80), Rotation = 12, ZIndex = 14, Parent = slot })
+		textLabel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 14, 0, -22), Size = UDim2.fromOffset(70, 28), Text = "NEW!", TextColor3 = Color3.fromRGB(255, 230, 80), Rotation = 12, ZIndex = 20, Parent = slot })
 	end
 	-- The rarer the pull, the bigger the pop
 	if pull.oneIn >= 100 then
@@ -575,19 +651,67 @@ local function showPull(slot: Frame, pull)
 	end
 	-- Very rare pulls: the screen flashes in the card's color and the card shakes
 	if pull.oneIn >= 1000 then
-		local flash = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = nameColor(pull.card, pull.variant), BackgroundTransparency = 0.2, ZIndex = 30, Parent = root })
+		local flash = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, BackgroundTransparency = 0.2, ZIndex = 30, Parent = root })
 		TweenService:Create(flash, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
 		task.delay(0.6, function()
 			flash:Destroy()
 		end)
-		task.spawn(function()
-			for i = 1, 8 do
-				holder.Rotation = if i % 2 == 0 then 4 else -4
-				task.wait(0.04)
-			end
-			holder.Rotation = 0
-		end)
+		task.spawn(shake, holder, 8, 4)
 	end
+	if pull.oneIn >= 10000 then
+		TweenService:Create(reveal, TweenInfo.new(0.6), { BackgroundTransparency = 0.2 }):Play()
+	end
+end
+
+-- The pack in the middle of the screen wobbles until it is tapped (or after a few seconds),
+-- then its top tears off and it drops away
+local function tearPack(pack: Config.Pack)
+	clearList(packStage)
+	packStage.Rotation = 0
+	packStage.Position = UDim2.fromScale(0.5, 0.52)
+	local art = PackArt.build(packStage, pack, 12)
+	local scale = create("UIScale", { Scale = 0.3, Parent = packStage })
+	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+
+	local event = Instance.new("BindableEvent")
+	tapped = event
+	local hitbox = create("TextButton", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 20, Parent = packStage })
+	hitbox.Activated:Connect(function()
+		event:Fire()
+	end)
+	revealHint.Visible = true
+	local waiting = true
+	task.spawn(function()
+		local t = 0
+		while waiting do
+			t += 1
+			packStage.Rotation = math.sin(t * 0.5) * (2 + math.min(t, 60) / 15)
+			task.wait(1 / 30)
+		end
+	end)
+	task.delay(4, function()
+		event:Fire()
+	end)
+	if not skipping then
+		event.Event:Wait()
+	end
+	waiting = false
+	tapped = nil
+	revealHint.Visible = false
+	hitbox:Destroy()
+	packStage.Rotation = 0
+	scale:Destroy()
+
+	if not skipping then
+		local top = art:FindFirstChild("Top") :: Frame
+		TweenService:Create(top, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.new(0.3, 0, -0.6, 0), Rotation = -35 }):Play()
+		task.wait(0.25)
+		TweenService:Create(packStage, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.fromScale(0.5, 1.4) }):Play()
+		task.wait(0.2)
+	end
+	task.delay(0.4, function()
+		clearList(packStage)
+	end)
 end
 
 openPack = function(packId: string)
@@ -600,6 +724,7 @@ openPack = function(packId: string)
 		return
 	end
 	opening = true
+	skipping = false
 	currentPack = packId
 	local pulls = remotes.OpenPack:InvokeServer(packId)
 	if not pulls then
@@ -613,19 +738,23 @@ openPack = function(packId: string)
 	revealButtons.Visible = false
 	revealTitle.Text = pack.name
 	revealTitle.TextColor3 = pack.color
+	reveal.BackgroundTransparency = 0.2
 	reveal.Visible = true
+	skipButton.Visible = true
 
+	tearPack(pack)
+
+	-- The cards fly out of the pack face down
 	local slots = {}
 	for index in pulls do
 		local slot = create("Frame", { LayoutOrder = index, Size = UDim2.fromOffset(200, 340), BackgroundTransparency = 1, ZIndex = 11, Parent = revealRow })
-		local holder = create("Frame", { Name = "Holder", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0), Size = CARD_SIZE, BackgroundTransparency = 1, ZIndex = 11, Parent = slot })
-		create("Frame", { Name = "Back", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 12, Parent = holder }, {
-			corner(14),
-			stroke(4),
-			gradient(pack.color, pack.color:Lerp(DARK, 0.6)),
-			textLabel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.5, 0.3), Text = "?", ZIndex = 13 }),
-		})
+		local holder = create("Frame", { Name = "Holder", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, (2 - index) * 230, 0, 260), Size = UDim2.fromOffset(60, 84), BackgroundTransparency = 1, ZIndex = 11, Parent = slot })
+		cardBack(holder, pack)
+		TweenService:Create(holder, TweenInfo.new(if skipping then 0.01 else 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0), Size = CARD_SIZE }):Play()
 		slots[index] = slot
+		if not skipping then
+			task.wait(0.12)
+		end
 	end
 	-- Rarest card last, for suspense
 	local order = {}
@@ -635,11 +764,14 @@ openPack = function(packId: string)
 	table.sort(order, function(a, b)
 		return pulls[a].oneIn < pulls[b].oneIn
 	end)
-	task.wait(0.4)
+	task.wait(if skipping then 0.05 else 0.5)
 	for _, index in order do
 		showPull(slots[index], pulls[index])
-		task.wait(if pulls[index].oneIn >= 1000 then 1 else 0.45)
+		if not skipping then
+			task.wait(if pulls[index].oneIn >= 1000 then 1 else 0.45)
+		end
 	end
+	skipButton.Visible = false
 	revealButtons.Visible = true
 	opening = false
 end
