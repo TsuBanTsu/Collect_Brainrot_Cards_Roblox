@@ -521,9 +521,10 @@ Config.TOWER_RERUN_BOSS_PACK_CHANCE = 0.4
 Config.TOWER_TRAIT_FLOORS = 5
 
 -- Pace of the fights, in seconds
-Config.TOWER_CLASH_TIME = 0.75 -- one headbutt
-Config.TOWER_FLOOR_TIME = 0.8 -- the enemy comes in (also the pause after a boss)
-Config.TOWER_CLEAR_TIME = 0.4 -- the pause after a normal floor
+Config.TOWER_START_TIME = 2 -- the arena appears and the camera gets in place
+Config.TOWER_CLASH_TIME = 1.1 -- one headbutt
+Config.TOWER_FLOOR_TIME = 1.4 -- the enemy comes in (also the pause after a boss)
+Config.TOWER_CLEAR_TIME = 0.8 -- the pause after a normal floor
 
 function Config.floorKind(floor: number): FloorKind
 	if floor % Config.FLOOR_KINDS.boss.every == 0 then

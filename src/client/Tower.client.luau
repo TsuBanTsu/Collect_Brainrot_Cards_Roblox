@@ -21,10 +21,10 @@ local ACCENT = Color3.fromRGB(80, 200, 120)
 local CASH_COLOR = Color3.fromRGB(120, 255, 140)
 
 local ORIGIN = Vector3.new(0, 1500, 3000) -- far from the map, only this client sees it
-local MODEL_HEIGHT = 7
+local MODEL_HEIGHT = 8
 local FRONT_X = 8 -- distance of the fighters from the middle
-local BENCH = { Vector3.new(-17, 0, -6), Vector3.new(-21, 0, 3) } -- the team cards waiting their turn
-local CAMERA_OFFSET = Vector3.new(0, 13, 44)
+local BENCH = { Vector3.new(-18, 0, -10), Vector3.new(-28, 0, -5) } -- the team cards waiting their turn
+local CAMERA_OFFSET = Vector3.new(0, 10, 34)
 
 ---------------------------------------------------------------------------
 -- Small helpers
@@ -162,7 +162,8 @@ local function buildArena(tower: Config.Tower)
 
 	-- Giant sign behind the ring: tower name and floor
 	local board = part({ Name = "Sign", Size = Vector3.new(44, 12, 1), CFrame = at(Vector3.new(0, 30, -52)), Color = DARK, Parent = model })
-	local gui = create("SurfaceGui", { Face = Enum.NormalId.Front, SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud, PixelsPerStud = 20, LightInfluence = 0, Parent = board })
+	-- Back face: the one turned toward the camera
+	local gui = create("SurfaceGui", { Face = Enum.NormalId.Back, SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud, PixelsPerStud = 20, LightInfluence = 0, Parent = board })
 	textLabel({ Size = UDim2.fromScale(1, 0.45), Text = string.upper(tower.name), TextColor3 = color, Parent = gui })
 	floorSign = textLabel({ Position = UDim2.fromScale(0, 0.45), Size = UDim2.fromScale(1, 0.55), Text = "FLOOR 1", Parent = gui })
 	part({ Name = "SignEdge", Size = Vector3.new(46, 14, 0.6), CFrame = at(Vector3.new(0, 30, -52.6)), Color = color, Material = Enum.Material.Neon, Parent = model })
@@ -404,6 +405,7 @@ local function cleanup()
 	end
 	hud.Enabled = false
 	endFrame.Visible = false
+	player:SetAttribute("TowerScreen", nil)
 end
 
 local function onStart(event)
@@ -419,6 +421,8 @@ local function onStart(event)
 	titleLabel.TextColor3 = tower.color
 	leaveButton.Visible = true
 	hud.Enabled = true
+	-- Local attribute: the main UI (Hud.client.luau) stays hidden until the end screen is closed
+	player:SetAttribute("TowerScreen", true)
 
 	team = {}
 	for index, fighter in event.team do

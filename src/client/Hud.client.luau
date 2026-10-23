@@ -1146,9 +1146,10 @@ end).Parent = towersPanel
 
 -- The main UI steps aside while the player is in a tower (Tower.client.luau draws the fight)
 local function refreshInTower()
-	root.Visible = player:GetAttribute("InTower") == nil
+	root.Visible = player:GetAttribute("InTower") == nil and player:GetAttribute("TowerScreen") == nil
 end
 player:GetAttributeChangedSignal("InTower"):Connect(refreshInTower)
+player:GetAttributeChangedSignal("TowerScreen"):Connect(refreshInTower)
 refreshInTower()
 
 ---------------------------------------------------------------------------

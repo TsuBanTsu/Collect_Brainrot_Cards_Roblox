@@ -149,7 +149,7 @@ local function runTower(player: Player, tower: Config.Tower, team: { string })
 	player:SetAttribute("InTower", tower.id)
 	freeze(player, true)
 	send(player, { type = "start", tower = tower.id, team = fighterInfo(fighters), best = profile.Towers[tower.id] or 0 })
-	task.wait(Config.TOWER_FLOOR_TIME)
+	task.wait(Config.TOWER_START_TIME)
 
 	local cleared = 0
 	local result = "defeat"
