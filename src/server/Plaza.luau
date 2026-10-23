@@ -386,6 +386,7 @@ local function buildStation(station: Station)
 		tag.MaxDistance = 45
 		tag.AlwaysOnTop = true -- the awning would hide it when the camera looks down
 		tag.Parent = anchor
+		CollectionService:AddTag(tag, "HideUnderUi")
 		label(tag, { Size = UDim2.fromScale(1, 0.55), Text = if card then card.name else keeper.card })
 		label(tag, { Position = UDim2.fromScale(0, 0.55), Size = UDim2.fromScale(1, 0.45), Text = keeper.title, TextColor3 = station.color })
 	end

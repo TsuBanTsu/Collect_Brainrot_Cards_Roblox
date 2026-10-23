@@ -6,6 +6,7 @@
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
@@ -537,7 +538,7 @@ local reveal = create("Frame", {
 })
 local revealTitle = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.12, 0), Size = UDim2.fromOffset(600, 44), Text = "", ZIndex = 11, Parent = reveal })
 local revealHint = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.84, 0), Size = UDim2.fromOffset(400, 34), Text = "TAP TO OPEN!", ZIndex = 11, Visible = false, Parent = reveal })
-local packStage = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), Size = UDim2.fromOffset(250, 350), BackgroundTransparency = 1, ZIndex = 11, Parent = reveal })
+local packStage = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), Size = UDim2.fromOffset(300, 420), BackgroundTransparency = 1, ZIndex = 11, Parent = reveal })
 local revealRow = create("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5),
 	Position = UDim2.fromScale(0.5, 0.55),
@@ -587,10 +588,10 @@ end
 
 -- Light rays turning behind a rare card
 local function rays(slot: Frame, color: Color3)
-	local center = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(100, 140), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, ZIndex = 11, Parent = slot })
+	local center = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(100, 140), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, ZIndex = 10, Parent = slot })
 	for i = 1, 6 do
 		create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(46, 460), Rotation = i * 30, BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 11, Parent = center }, {
-			create("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.35), NumberSequenceKeypoint.new(1, 1) }) }),
+			create("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.55), NumberSequenceKeypoint.new(1, 1) }) }),
 		})
 	end
 	local scale = create("UIScale", { Scale = 0, Parent = center })
@@ -642,7 +643,7 @@ local function showPull(slot: Frame, pull)
 
 	local chance = textLabel({ Position = UDim2.new(0, 0, 1, -48), Size = UDim2.new(1, 0, 0, 34), Text = "1/" .. Format.number(pull.oneIn), TextColor3 = color, ZIndex = 13, Parent = slot })
 	if pull.new then
-		textLabel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 14, 0, -22), Size = UDim2.fromOffset(70, 28), Text = "NEW!", TextColor3 = Color3.fromRGB(255, 230, 80), Rotation = 12, ZIndex = 20, Parent = slot })
+		textLabel({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0, -14, 0, -22), Size = UDim2.fromOffset(70, 28), Text = "NEW!", TextColor3 = Color3.fromRGB(255, 230, 80), Rotation = -12, ZIndex = 20, Parent = slot })
 	end
 	-- The rarer the pull, the bigger the pop
 	if pull.oneIn >= 100 then
@@ -748,7 +749,7 @@ openPack = function(packId: string)
 	local slots = {}
 	for index in pulls do
 		local slot = create("Frame", { LayoutOrder = index, Size = UDim2.fromOffset(200, 340), BackgroundTransparency = 1, ZIndex = 11, Parent = revealRow })
-		local holder = create("Frame", { Name = "Holder", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, (2 - index) * 230, 0, 260), Size = UDim2.fromOffset(60, 84), BackgroundTransparency = 1, ZIndex = 11, Parent = slot })
+		local holder = create("Frame", { Name = "Holder", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, (2 - index) * 230, 0, 260), Size = UDim2.fromOffset(60, 84), BackgroundTransparency = 1, ZIndex = 12, Parent = slot })
 		cardBack(holder, pack)
 		TweenService:Create(holder, TweenInfo.new(if skipping then 0.01 else 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0), Size = CARD_SIZE }):Play()
 		slots[index] = slot
@@ -775,6 +776,25 @@ openPack = function(packId: string)
 	revealButtons.Visible = true
 	opening = false
 end
+
+-- While a pack opens, the top bar steps aside; while any window is open, the shopkeepers'
+-- name tags (always drawn on top of the world) are hidden so they never cross the UI
+reveal:GetPropertyChangedSignal("Visible"):Connect(function()
+	statsBar.Visible = not reveal.Visible
+	weatherLabel.Visible = not reveal.Visible
+end)
+task.spawn(function()
+	while true do
+		local covered = reveal.Visible
+		for _, panel in panels do
+			covered = covered or panel.Visible
+		end
+		for _, tag in CollectionService:GetTagged("HideUnderUi") do
+			(tag :: BillboardGui).Enabled = not covered
+		end
+		task.wait(0.25)
+	end
+end)
 
 -- Packs in the Roblox backpack (PackTools.luau): click or tap while holding one to open it.
 -- A big OPEN button also shows while a pack is in hand, easier to hit on phones.
