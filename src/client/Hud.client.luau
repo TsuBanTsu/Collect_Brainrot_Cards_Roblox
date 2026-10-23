@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
+local GuiService = game:GetService("GuiService")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
@@ -244,6 +245,20 @@ local function statBox(order: number, title: string, color: Color3)
 	return textLabel({ Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 32), Text = "0", Parent = box })
 end
 
+-- Keeps the top bar just under Roblox's own buttons (menu, chat), whatever the screen
+local function placeTopBar()
+	local ok, inset = pcall(function()
+		return GuiService.TopbarInset.Height
+	end)
+	local top = math.max(44, (if ok then inset else 0) / uiScale.Scale + 6)
+	statsBar.Position = UDim2.new(0.5, 0, 0, top)
+end
+uiScale:GetPropertyChangedSignal("Scale"):Connect(placeTopBar)
+pcall(function()
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(placeTopBar)
+end)
+placeTopBar()
+
 local cashValue = statBox(1, "CASH", CASH_COLOR)
 local incomeValue = statBox(2, "PER SECOND", Color3.fromRGB(255, 220, 80))
 local backpackValue = statBox(3, "BACKPACK", Color3.fromRGB(120, 190, 255))
@@ -275,7 +290,7 @@ player:GetAttributeChangedSignal("Cash"):Connect(function()
 		Size = UDim2.fromOffset(200, 30),
 		Text = "+$" .. Format.number(gained),
 		TextColor3 = CASH_COLOR,
-		ZIndex = 5,
+		ZIndex = 0, -- under the windows
 		Parent = root,
 	})
 	TweenService:Create(popup, TweenInfo.new(1, Enum.EasingStyle.Quad), { Position = popup.Position + UDim2.fromOffset(0, 40), TextTransparency = 1 }):Play()
@@ -291,10 +306,16 @@ end)
 local weatherLabel = textLabel({
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0, 128),
+	-- follows the top bar (see placeTopBar)
 	Size = UDim2.fromOffset(520, 22),
 	Text = "",
 	Parent = root,
 })
+
+statsBar:GetPropertyChangedSignal("Position"):Connect(function()
+	weatherLabel.Position = UDim2.new(0.5, 0, 0, statsBar.Position.Y.Offset + 84)
+end)
+weatherLabel.Position = UDim2.new(0.5, 0, 0, statsBar.Position.Y.Offset + 84)
 
 local function refreshWeather()
 	local weatherId = ReplicatedStorage:GetAttribute("Weather") or ""
@@ -461,7 +482,7 @@ local function refreshPacks()
 			local tile = create("Frame", { LayoutOrder = pack.order, BackgroundTransparency = 1, Parent = packsList })
 			local art = create("Frame", { Size = UDim2.fromOffset(140, 196), BackgroundTransparency = 1, Parent = tile })
 			PackArt.build(art, pack)
-			textLabel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 6, 0, -6), Size = UDim2.fromOffset(56, 30), Text = "x" .. count, TextColor3 = Color3.fromRGB(255, 225, 60), Rotation = 8, ZIndex = 5, Parent = tile })
+			textLabel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 6, 0, -6), Size = UDim2.fromOffset(56, 30), Text = "x" .. count, Visible = count > 1, TextColor3 = Color3.fromRGB(255, 225, 60), Rotation = 8, ZIndex = 5, Parent = tile })
 			button({ Position = UDim2.fromOffset(10, 202), Size = UDim2.fromOffset(120, 44), Text = "OPEN", BackgroundColor3 = ACCENT }, function()
 				openPack(pack.id)
 			end).Parent = tile
@@ -829,6 +850,7 @@ reveal:GetPropertyChangedSignal("Visible"):Connect(function()
 	statsBar.Visible = not reveal.Visible
 	weatherLabel.Visible = not reveal.Visible
 end)
+local hotbarHidden = false
 task.spawn(function()
 	while true do
 		local covered = reveal.Visible
@@ -837,6 +859,13 @@ task.spawn(function()
 		end
 		for _, tag in CollectionService:GetTagged("HideUnderUi") do
 			(tag :: BillboardGui).Enabled = not covered
+		end
+		-- The Roblox hotbar would cover the bottom of the windows (on phones above all)
+		if covered ~= hotbarHidden then
+			hotbarHidden = covered
+			pcall(function()
+				StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, not covered)
+			end)
 		end
 		task.wait(0.25)
 	end
@@ -851,12 +880,9 @@ local openHeld = button({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.ne
 	end
 end)
 openHeld.Parent = root
--- During the opening: no OPEN PACK button, and the Roblox hotbar steps aside too
+-- During the opening: no OPEN PACK button
 reveal:GetPropertyChangedSignal("Visible"):Connect(function()
 	openHeld.Visible = heldPack ~= nil and not reveal.Visible
-	pcall(function()
-		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, not reveal.Visible)
-	end)
 end)
 
 local function watchTool(tool: Instance)
