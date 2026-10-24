@@ -23,7 +23,7 @@ local Weather = require(script.Parent.Weather)
 ---------------------------------------------------------------------------
 local remotes = Instance.new("Folder")
 remotes.Name = "Remotes"
-for _, name in { "ProfileSync", "RequestSync", "Notify", "Announce", "PlaceCard", "RemoveCard", "PlaceBest", "Fuse", "ClaimDaily", "BuyPack", "UpgradeBackpack", "SellCard", "SellPack", "TowerEvent", "SetTeam", "StartTower", "LeaveTower", "Teleport", "BuyUpgrade", "BuyAllUpgrades", "AdminAction" } do
+for _, name in { "ProfileSync", "RequestSync", "Notify", "Announce", "PlaceCard", "RemoveCard", "PlaceBest", "Fuse", "ClaimDaily", "BuyPack", "UpgradeBackpack", "SellCard", "SellPack", "TowerEvent", "SetTeam", "StartTower", "LeaveTower", "TowerMode", "Teleport", "BuyUpgrade", "BuyAllUpgrades", "AdminAction" } do
 	local remote = Instance.new("RemoteEvent")
 	remote.Name = name
 	remote.Parent = remotes

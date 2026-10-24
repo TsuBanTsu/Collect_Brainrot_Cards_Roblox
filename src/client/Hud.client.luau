@@ -1776,34 +1776,22 @@ refreshTowers = function()
 		textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -200, 0, 26), Text = tower.name, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
 		local floors = if tower.floors then string.format("Best: %d/%d", best, tower.floors) else string.format("Best: floor %d", best)
 		textLabel({ Position = UDim2.fromOffset(10, 31), Size = UDim2.new(1, -200, 0, 19), Text = floors, TextColor3 = Color3.fromRGB(220, 220, 230), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-		local autoTower = player:GetAttribute("TowerAuto")
-		local function start(auto: boolean)
+		-- A fight going on in the background (hidden, see Tower.client.luau): no new one
+		local busyTower = player:GetAttribute("TowerAuto")
+		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(88, 42), Text = "ENTER", BackgroundColor3 = if #team > 0 and not busyTower then ACCENT else GREY }, function()
 			if #team == 0 then
 				toast("Add cards to your team first", RED)
 				return
 			end
-			if autoTower then
-				toast("Stop the autoplay first", RED)
+			if busyTower then
+				toast("Your team is already fighting: tap the swords on the right", RED)
 				return
 			end
 			for _, panel in panels do
 				panel.Visible = false
 			end
-			remotes.StartTower:FireServer(tower.id, auto)
-		end
-		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -100, 0.5, 0), Size = UDim2.fromOffset(88, 42), Text = "ENTER", BackgroundColor3 = if #team > 0 and not autoTower then ACCENT else GREY }, function()
-			start(false)
+			remotes.StartTower:FireServer(tower.id)
 		end).Parent = row
-		-- Autoplay: fights in the background and climbs again after each defeat
-		if autoTower == tower.id then
-			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(88, 42), Text = "STOP", BackgroundColor3 = RED }, function()
-				remotes.LeaveTower:FireServer()
-			end).Parent = row
-		else
-			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(88, 42), Text = "AUTO", BackgroundColor3 = if #team > 0 and not autoTower then Color3.fromRGB(60, 150, 230) else GREY }, function()
-				start(true)
-			end).Parent = row
-		end
 	end
 end
 

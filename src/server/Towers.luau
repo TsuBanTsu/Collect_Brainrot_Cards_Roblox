@@ -14,9 +14,11 @@ local PlayerData = require(script.Parent.PlayerData)
 local Towers = {}
 
 type Fighter = { key: string, cardId: string, hp: number, maxHp: number, dmg: number }
--- `auto`: the fight runs in the background (no arena, the player keeps playing) and starts
--- again by itself after each defeat or clear, until the player stops it
-type Run = { stopped: boolean, auto: boolean }
+-- A run always starts on screen. During the fight the player can turn on `auto` (the tower
+-- starts again by itself after each defeat or clear, until the player leaves or turns it off)
+-- and `hidden` (the fight goes on in the background: the player is free to move and keeps
+-- playing, a button with two swords brings the fight back on screen)
+type Run = { stopped: boolean, auto: boolean, hidden: boolean, tower: Config.Tower }
 
 local runs: { [Player]: Run } = {}
 local rng = Random.new()
@@ -137,7 +139,6 @@ end
 local function climb(player: Player, tower: Config.Tower, team: { string }, run: Run): string
 	local profile = PlayerData.get(player)
 	local function send(event)
-		event.auto = run.auto
 		towerEvent:FireClient(player, event)
 	end
 
@@ -214,21 +215,26 @@ local function climb(player: Player, tower: Config.Tower, team: { string }, run:
 		announce(player.DisplayName .. " cleared the " .. tower.name .. "!", tower.color)
 	end
 	if player.Parent then
-		send({ type = "end", result = result, floor = cleared, earned = earned })
+		-- `again`: autoplay will start a new climb
+		send({ type = "end", result = result, floor = cleared, earned = earned, again = run.auto and not run.stopped and result ~= "left" })
 		PlayerData.sync(player)
 	end
 	return result
 end
 
-local function runTower(player: Player, tower: Config.Tower, auto: boolean)
-	local run: Run = { stopped = false, auto = auto }
+-- On screen: the character waits, anchored, and the main UI steps aside (InTower). In the
+-- background: the character is free (TowerAuto, for the swords button and the Towers panel).
+local function setHidden(player: Player, run: Run, hidden: boolean)
+	run.hidden = hidden
+	freeze(player, not hidden)
+	player:SetAttribute("InTower", if hidden then nil else run.tower.id)
+	player:SetAttribute("TowerAuto", if hidden then run.tower.id else nil)
+end
+
+local function runTower(player: Player, tower: Config.Tower)
+	local run: Run = { stopped = false, auto = false, hidden = false, tower = tower }
 	runs[player] = run
-	if auto then
-		player:SetAttribute("TowerAuto", tower.id)
-	else
-		player:SetAttribute("InTower", tower.id)
-		freeze(player, true)
-	end
+	setHidden(player, run, false)
 	while player.Parent do
 		local profile = PlayerData.get(player)
 		local team = if profile then PlayerData.validTeam(profile) else {}
@@ -236,23 +242,20 @@ local function runTower(player: Player, tower: Config.Tower, auto: boolean)
 			break
 		end
 		climb(player, tower, team, run)
-		if not auto or run.stopped then
+		if not run.auto or run.stopped then
 			break
 		end
 		-- Autoplay: a short pause, then the next climb (with the team as it is now)
 		task.wait(Config.TOWER_AUTO_RESTART_TIME)
-		if run.stopped then
+		if not run.auto or run.stopped then
 			break
 		end
 	end
 	if player.Parent then
-		if auto then
-			player:SetAttribute("TowerAuto", nil)
-			towerEvent:FireClient(player, { type = "autoStop", auto = true })
-		else
-			freeze(player, false)
-			player:SetAttribute("InTower", nil)
-		end
+		freeze(player, false)
+		player:SetAttribute("InTower", nil)
+		player:SetAttribute("TowerAuto", nil)
+		towerEvent:FireClient(player, { type = "runEnd" })
 	end
 	runs[player] = nil
 end
@@ -280,8 +283,7 @@ function Towers.init(remotes: Folder, notifyFn: (Player, string) -> (), announce
 		PlayerData.sync(player)
 	end);
 
-	-- `auto` true: autoplay in the background (see Run)
-	(remotes:WaitForChild("StartTower") :: RemoteEvent).OnServerEvent:Connect(function(player, towerId: any, auto: any)
+	(remotes:WaitForChild("StartTower") :: RemoteEvent).OnServerEvent:Connect(function(player, towerId: any)
 		local profile = PlayerData.get(player)
 		local tower = type(towerId) == "string" and Config.TOWER[towerId]
 		if not profile or not tower or runs[player] then
@@ -296,13 +298,27 @@ function Towers.init(remotes: Folder, notifyFn: (Player, string) -> (), announce
 			notify(player, "Choose your team first")
 			return
 		end
-		task.spawn(runTower, player, tower, auto == true)
+		task.spawn(runTower, player, tower)
 	end);
 
 	(remotes:WaitForChild("LeaveTower") :: RemoteEvent).OnServerEvent:Connect(function(player)
 		local run = runs[player]
 		if run then
 			run.stopped = true
+		end
+	end);
+
+	-- During a run: ("auto", on) turns autoplay on or off, ("hidden", on) sends the fight to the
+	-- background or brings it back on screen
+	(remotes:WaitForChild("TowerMode") :: RemoteEvent).OnServerEvent:Connect(function(player, mode: any, on: any)
+		local run = runs[player]
+		if not run or run.stopped or type(on) ~= "boolean" then
+			return
+		end
+		if mode == "auto" then
+			run.auto = on
+		elseif mode == "hidden" and on ~= run.hidden then
+			setHidden(player, run, on)
 		end
 	end);
 
