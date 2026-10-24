@@ -669,9 +669,9 @@ Config.GRADES = {
 -- Grading a card costs GRADE_COST_SECONDS of its Cash (variant included). A grade adds about
 -- +55% on average, so it pays for itself after about 9 minutes on a stand.
 Config.GRADE_COST_SECONDS = 300
--- A graded card can be graded again (a reroll) for this share of the price. It only keeps
+-- A graded card can be graded again (a reroll) for this times the price. It only keeps
 -- the new grade if it is better, so a reroll never makes a card worse.
-Config.REGRADE_COST_RATIO = 0.5
+Config.REGRADE_COST_RATIO = 1.5
 
 function Config.gradeCost(cardId: string, variantId: string): number
 	return math.max(1, math.floor(Config.cardIncome(cardId, variantId) * Config.GRADE_COST_SECONDS))
