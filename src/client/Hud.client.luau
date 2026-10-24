@@ -1017,26 +1017,40 @@ local function tearPack(pack: Config.Pack)
 	scale:Destroy()
 
 	if not skipping then
-		-- The pack swells, then bursts open in a flash
-		local swell = create("UIScale", { Parent = packStage })
-		TweenService:Create(swell, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Scale = 1.15 }):Play()
-		pause(0.18)
-		sfx("tear")
-		local flash = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.3, ZIndex = 30, Parent = root })
-		TweenService:Create(flash, TweenInfo.new(0.4), { BackgroundTransparency = 1 }):Play()
-		task.delay(0.4, function()
-			flash:Destroy()
-		end)
-		burst(reveal, UDim2.fromScale(0.5, 0.35), pack.color, 18, 260)
-		screenShake(0.25, 10)
-		TweenService:Create(swell, TweenInfo.new(0.2), { Scale = 1 }):Play()
 		local packRaysNow = packStage:FindFirstChild("Rays")
 		if packRaysNow then
 			packRaysNow:Destroy()
 		end
+		-- The top tears off bit by bit, from left to right: the torn part peels up and curls
+		-- back a little more with each bit, leaving a ragged white edge on the bag, then the
+		-- whole strip comes off
 		local top = art:FindFirstChild("Top") :: Frame
-		TweenService:Create(top, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.new(0.3, 0, -0.6, 0), Rotation = -35 }):Play()
-		pause(0.25)
+		local line = art:FindFirstChild("TearLine") :: Frame
+		local count = PackArt.TEAR_SLICES
+		for torn = 1, count do
+			for i = 1, torn do
+				local slice = top:FindFirstChild("Slice" .. i) :: Frame
+				local peel = torn - i + 1 -- the first bits torn are the farthest up
+				TweenService:Create(slice, TweenInfo.new(0.07), { Position = UDim2.new((i - 1) / count, 0, -0.18 * peel, -peel * 2), Rotation = -peel * 5 }):Play()
+			end
+			for _, bit in { line:FindFirstChild("Bit" .. (torn * 2 - 1)), line:FindFirstChild("Bit" .. (torn * 2)) } do
+				(bit :: Frame).Visible = true
+			end
+			if torn % 3 == 1 then
+				sfx("tick", 0.7 + torn * 0.04)
+			end
+			burst(packStage, UDim2.fromScale(torn / count, 0.07), Color3.new(1, 1, 1), 1, 40)
+			pause(0.05)
+		end
+		sfx("tear")
+		TweenService:Create(top, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.new(0.6, 0, -0.9, 0), Rotation = 25 }):Play()
+		-- Light pours out of the open top
+		local glow = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.07), Size = UDim2.new(0.9, 0, 0, 10), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 30, Parent = packStage }, {
+			create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		})
+		TweenService:Create(glow, TweenInfo.new(0.35), { Size = UDim2.new(1.3, 0, 0, 60), BackgroundTransparency = 1 }):Play()
+		burst(reveal, UDim2.fromScale(0.5, 0.25), pack.color, 12, 200)
+		pause(0.35)
 		TweenService:Create(packStage, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.fromScale(0.5, 1.4) }):Play()
 		pause(0.2)
 	end

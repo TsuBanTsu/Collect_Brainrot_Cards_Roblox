@@ -55,8 +55,35 @@ local function crimp(parent: Instance, name: string, top: boolean, color: Color3
 	return strip
 end
 
+-- The top seal, cut in TEAR_SLICES narrow pieces ("Slice1" on the left...) so the opening can
+-- tear it off bit by bit, from left to right. Each piece has its own ridge; together they look
+-- like the bottom seal. "TearLine" (hidden) is the ragged white edge left on the bag.
+PackArt.TEAR_SLICES = 12
+
+local function tearableTop(parent: Instance, color: Color3, z: number): Frame
+	local top = new("Frame", { Name = "Top", Size = UDim2.fromScale(1, 0.09), BackgroundTransparency = 1, ZIndex = z }, parent)
+	local count = PackArt.TEAR_SLICES
+	for i = 1, count do
+		local slice = new("Frame", { Name = "Slice" .. i, Position = UDim2.fromScale((i - 1) / count, 0), Size = UDim2.new(1 / count, 1, 1, 0), BackgroundColor3 = color:Lerp(DARK, 0.35), BorderSizePixel = 0, ZIndex = z }, top)
+		if i == 1 or i == count then
+			new("UICorner", { CornerRadius = UDim.new(0.25, 0) }, slice)
+		end
+		new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.3, 0.6), BackgroundColor3 = WHITE, BackgroundTransparency = 0.55, BorderSizePixel = 0, ZIndex = z + 1 }, slice)
+		-- Dark edges top and bottom, like the outline of the other seal
+		for _, y in { 0, 1 } do
+			new("Frame", { AnchorPoint = Vector2.new(0, y), Position = UDim2.fromScale(0, y), Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = DARK, BorderSizePixel = 0, ZIndex = z + 1 }, slice)
+		end
+	end
+	-- Ragged white edge where the bag is torn: little turned squares along the cut
+	local line = new("Frame", { Name = "TearLine", Position = UDim2.fromScale(0, 0.075), Size = UDim2.fromScale(1, 0.03), BackgroundTransparency = 1, ZIndex = z - 1 }, parent)
+	for i = 1, count * 2 do
+		new("Frame", { Name = "Bit" .. i, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale((i - 0.5) / (count * 2), if i % 2 == 0 then 0.35 else 0.65), Size = UDim2.fromScale(1 / (count * 1.6), 1.1), Rotation = 45, BackgroundColor3 = Color3.fromRGB(250, 250, 245), BorderSizePixel = 0, Visible = false, ZIndex = z - 1 }, line)
+	end
+	return top
+end
+
 -- Builds the pack inside `parent` (filling it). The top seal is named "Top" so the opening
--- can tear it off.
+-- can tear it off (see tearableTop).
 function PackArt.build(parent: Instance, pack: Config.Pack, zIndex: number?): Frame
 	local z = zIndex or 1
 	local frame = new("Frame", { Name = "Pack", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = z }, parent)
@@ -100,7 +127,7 @@ function PackArt.build(parent: Instance, pack: Config.Pack, zIndex: number?): Fr
 	text(body, { Position = UDim2.fromScale(0.06, 0.67), Size = UDim2.fromScale(0.88, 0.15), Text = short, ZIndex = z + 3 })
 	text(body, { Position = UDim2.fromScale(0.25, 0.82), Size = UDim2.fromScale(0.5, 0.08), Text = "BRAINROT PACK", TextColor3 = Color3.fromRGB(255, 225, 60), ZIndex = z + 3 })
 
-	crimp(frame, "Top", true, pack.color, z + 4)
+	tearableTop(frame, pack.color, z + 4)
 	crimp(frame, "Bottom", false, pack.color, z + 4)
 	return frame
 end
