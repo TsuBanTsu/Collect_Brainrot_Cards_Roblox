@@ -526,7 +526,15 @@ remotes.Teleport.OnServerEvent:Connect(function(player, target: any)
 			weld:Destroy()
 		end
 		humanoid.Sit = false
-		task.wait()
+		-- The character jumps off the seat for a moment: move it once it is up, and again a
+		-- little later in case that jump put it back where it was
+		local started = os.clock()
+		while humanoid.SeatPart and os.clock() - started < 0.5 do
+			task.wait()
+		end
+		task.wait(0.1)
+		character:PivotTo(goal)
+		task.wait(0.2)
 	end
 	character:PivotTo(goal)
 end)
