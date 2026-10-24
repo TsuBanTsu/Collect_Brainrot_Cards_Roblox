@@ -1083,7 +1083,8 @@ Config.MODEL_HEIGHT = 9 -- bigger than a player, like in the big brainrot games
 -- with the blocky models of the free "Brainrot Pack [150+]" (137461628889541), saved in
 -- ServerStorage > AssetLibrary. id = 0: the model only exists in that library.
 Config.ASSETS = {
-	noobini = { id = 76207239035844 },
+	-- Blocky, arms down (the first one stood in a T-pose, facing backwards)
+	noobini = { id = 88328373857493 },
 	lirili = { id = 77231614368559 },
 	timcheese = { id = 104326039056736 },
 	pipikiwi = { id = 94106203385238 },

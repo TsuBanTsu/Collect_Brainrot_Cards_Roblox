@@ -63,7 +63,9 @@ end
 local function fetch(key: string, info): Model?
 	local library = ServerStorage:FindFirstChild("AssetLibrary")
 	local saved = library and library:FindFirstChild(key)
-	if saved and saved:IsA("Model") then
+	-- A saved copy of an older model (another id in Config) is skipped: load the new one
+	local savedId = saved and saved:GetAttribute("AssetId")
+	if saved and saved:IsA("Model") and (savedId == nil or savedId == info.id) then
 		return saved:Clone()
 	end
 	if info.id == 0 then
