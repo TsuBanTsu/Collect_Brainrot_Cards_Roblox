@@ -864,6 +864,7 @@ end
 -- in the upgrade tree (Stand Builder)
 Config.STAND_COUNT = 12
 Config.BASE_STANDS = 8
+Config.WALK_SPEED = 20 -- Roblox default is 16
 Config.STARTING_CASH = 250 -- enough for 5 Starter Packs
 Config.OFFLINE_MAX_HOURS = 8
 Config.INDEX_BONUS = 0.10 -- +10% cash for each pack fully completed in the Index (normal variants)

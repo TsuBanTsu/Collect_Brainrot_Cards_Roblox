@@ -67,7 +67,7 @@ local function applyWalkSpeed(player: Player)
 	local profile = PlayerData.get(player)
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if profile and humanoid then
-		humanoid.WalkSpeed = 16 * (1 + PlayerData.bonus(profile, "walk"))
+		humanoid.WalkSpeed = Config.WALK_SPEED * (1 + PlayerData.bonus(profile, "walk"))
 	end
 end
 

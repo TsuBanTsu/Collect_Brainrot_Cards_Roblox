@@ -1853,12 +1853,29 @@ for order, entry in { { "Packs", PACKS_COLOR, "📦" }, { "Cards", CARDS_COLOR, 
 	end).Parent = sideBar
 end
 
--- Teleports: two smaller buttons side by side under the others
-local teleportRow = create("Frame", { LayoutOrder = 10, Size = UDim2.fromOffset(150, 46), BackgroundTransparency = 1, Parent = sideBar }, {
-	create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6) }),
+-- Teleports: two buttons at the very top of the screen, in the row of Roblox's own buttons
+local teleportRow = create("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromOffset(0, 6), Size = UDim2.fromOffset(250, 40), BackgroundTransparency = 1, Parent = root }, {
+	create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 10) }),
 })
+-- As tall as Roblox's top row allows, so it never runs into the top bar under it
+local function placeTeleportRow()
+	local ok, inset = pcall(function()
+		return GuiService.TopbarInset.Height
+	end)
+	local height = math.clamp((if ok then inset else 0) / uiScale.Scale - 12, 34, 44)
+	teleportRow.Position = UDim2.new(0.5, 0, 0, 6)
+	teleportRow.Size = UDim2.fromOffset(250, height)
+end
+uiScale:GetPropertyChangedSignal("Scale"):Connect(placeTeleportRow)
+pcall(function()
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(placeTeleportRow)
+end)
+placeTeleportRow()
+reveal:GetPropertyChangedSignal("Visible"):Connect(function()
+	teleportRow.Visible = not reveal.Visible
+end)
 for order, entry in { { "base", "🏠 BASE", Color3.fromRGB(70, 140, 230) }, { "shop", "🛒 SHOP", SHOP_COLOR } } do
-	button({ LayoutOrder = order, Size = UDim2.fromOffset(72, 46), Text = entry[2], BackgroundColor3 = entry[3] }, function()
+	button({ LayoutOrder = order, Size = UDim2.new(0, 120, 1, 0), Text = entry[2], BackgroundColor3 = entry[3] }, function()
 		for _, panel in panels do
 			panel.Visible = false
 		end
