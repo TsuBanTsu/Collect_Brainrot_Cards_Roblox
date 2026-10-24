@@ -260,10 +260,9 @@ local function showCard(stand: Stand, key: string)
 		CanQuery = false,
 		Parent = stand.display,
 	})
-	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
-		local gui = surfaceGui(cardPart, face, 50)
-		CardArt.build(gui, cardId, variantId, grade, nil, (Config.keyTrait(key) or {} :: any).id)
-	end
+	-- Its face is drawn by each player's client, like the cards of the UI (StandCards.client.luau)
+	cardPart:SetAttribute("CardKey", key)
+	CollectionService:AddTag(cardPart, "StandCard")
 	if variantId == "holo" or variantId == "rainbow" then
 		local sparkles = Instance.new("Sparkles")
 		sparkles.SparkleColor = color
