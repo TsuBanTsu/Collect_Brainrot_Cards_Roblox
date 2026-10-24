@@ -73,6 +73,16 @@ function PackArt.build(parent: Instance, pack: Config.Pack, zIndex: number?): Fr
 	local shine = new("Frame", { Name = "Shine", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.3, 0.5), Size = UDim2.fromScale(0.25, 1.3), Rotation = 18, BackgroundColor3 = WHITE, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = z + 1 }, body)
 	new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.3), NumberSequenceKeypoint.new(1, 1) }) }, shine)
 
+	-- The pack's own illustration, if it has one: it covers the front of the bag
+	local art = Config.PACK_ART[pack.id]
+	if art then
+		local picture = new("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. art, ScaleType = Enum.ScaleType.Crop, ZIndex = z + 2 }, body)
+		new("UICorner", { CornerRadius = UDim.new(0.06, 0) }, picture)
+		crimp(frame, "Top", true, pack.color, z + 4)
+		crimp(frame, "Bottom", false, pack.color, z + 4)
+		return frame
+	end
+
 	-- The rarest brainrot of the pack in a round window
 	local window = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.14), Size = UDim2.fromScale(0.78, 0.5), BackgroundColor3 = DARK, BackgroundTransparency = 0.25, ClipsDescendants = true, ZIndex = z + 2 }, body)
 	new("UICorner", { CornerRadius = UDim.new(0.5, 0) }, window)

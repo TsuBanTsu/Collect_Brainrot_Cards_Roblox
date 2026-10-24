@@ -2,7 +2,8 @@
 -- load them by itself. In Roblox Studio (edit mode, not Play): paste this whole file into
 -- the command bar (View > Command Bar) and press Enter, then save the place.
 -- The brainrot and decoration models land in ServerStorage > AssetLibrary, where Assets.luau finds them.
--- Scripts inside the models are deleted. Running it again only adds the models still missing.
+-- Scripts inside the models are deleted. Running it again only adds the models still missing,
+-- and replaces the ones whose id changed in Config (each model remembers its AssetId).
 
 -- A fresh copy: Studio keeps an old version of a module that was already required
 local Config = require(game.ReplicatedStorage.Shared.Config:Clone())
@@ -25,13 +26,19 @@ for key, info in Config.DECOR do
 end
 for key, info in all do
 	task.wait(0.2)
-	if not library:FindFirstChild(key) then
+	local saved = library:FindFirstChild(key)
+	if saved and saved:GetAttribute("AssetId") ~= nil and saved:GetAttribute("AssetId") ~= info.id then
+		saved:Destroy()
+		saved = nil
+	end
+	if not saved then
 		local ok, objects = pcall(function()
 			return game:GetObjects("rbxassetid://" .. info.id)
 		end)
 		if ok and objects[1] then
 			local model = Instance.new("Model")
 			model.Name = key
+			model:SetAttribute("AssetId", info.id)
 			for _, object in objects do
 				object.Parent = model
 			end

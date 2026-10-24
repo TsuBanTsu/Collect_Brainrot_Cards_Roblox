@@ -192,8 +192,8 @@ Config.PACKS = {
 			uncommon = { { id = "trictrac", name = "Tric Trac Baraboom", model = "Normal/Tric Trac Barabum" }, { id = "rhino", name = "Rhino Toasterino", model = "Normal/Rhino Toasterino" } },
 			rare = { { id = "cappuccino", name = "Cappuccino Assassino", model = "Normal/Cappuccino Assassino" }, { id = "burbaloni", name = "Burbaloni Luliloli", model = "Normal/Burbaloni Luliloli" } },
 			epic = { { id = "orangutini", name = "Orangutini Ananassini", model = "Normal/Orangutini Ananassini" } },
-			legendary = { { id = "tungtung", name = "Tung Tung Tung Sahur" }, { id = "odin", name = "Odin Din Din Dun", model = "Normal/Odin Din Din Dun" } },
-			mythic = { { id = "matteo", name = "Matteo", model = "Normal/Matteo" } },
+			legendary = { { id = "matteo", name = "Matteo", model = "Normal/Matteo" }, { id = "odin", name = "Odin Din Din Dun", model = "Normal/Odin Din Din Dun" } },
+			mythic = { { id = "tungtung", name = "Tung Tung Tung Sahur" } },
 		},
 	},
 	{
@@ -320,8 +320,8 @@ Config.PACKS = {
 			legendary = { { id = "diamond_timcheese", name = "Diamond Tim Cheese", model = "Diamante/Diamond Tim Cheese" }, { id = "diamond_trippi", name = "Diamond Trippi Troppi", model = "Diamante/Diamond Trippi Troppi" } },
 			mythic = { { id = "diamond_bananadancana", name = "Diamond Banana Dancana", model = "Diamante/Diamond Banana Dancana" }, { id = "diamond_swagsoda", name = "Diamond Swag Soda", model = "Diamante/Diamond Swag Soda" } },
 			secret = { { id = "diamond_talpa", name = "Diamond Talpa di Fero", model = "Diamante/Diamond Talpa Di Fero" } },
-			divine = { { id = "diamond_chimpanzini", name = "Diamond Chimpanzini Bananini", model = "Diamante/Diamond Chimpanzini Bananini" } },
-			god = { { id = "diamond_zibrazubrazibralini", name = "Diamond Zibra Zubra Zibralini", model = "Diamante/Diamond Zibra Zubra Zibralini" } },
+			divine = { { id = "diamond_zibrazubrazibralini", name = "Diamond Zibra Zubra Zibralini", model = "Diamante/Diamond Zibra Zubra Zibralini" } },
+			god = { { id = "diamond_chimpanzini", name = "Diamond Chimpanzini Bananini", model = "Diamante/Diamond Chimpanzini Bananini" } },
 		},
 	},
 	{
@@ -335,9 +335,9 @@ Config.PACKS = {
 		cards = {
 			legendary = { { id = "diamond_agarrinilapallini", name = "Diamond Agarrini La Pallini", model = "Diamante/Diamond Agarrini La Pallini" }, { id = "diamond_trippitroppitroppatrippa", name = "Diamond Trippi Troppi Troppa Trippa", model = "Diamante/Diamond Trippi Troppi Troppa Trippa" } },
 			mythic = { { id = "diamond_brribrribicusdicus", name = "Diamond Brri Brri Bicus Dicus", model = "Diamante/Diamond Brri Brri Bicus Dicus" }, { id = "diamond_strawberrelliflamingelli", name = "Diamond Strawberrelli Flamingelli", model = "Diamante/Diamond Strawberrelli Flamingelli" } },
-			secret = { { id = "diamond_cappuccino", name = "Diamond Cappuccino Assassino", model = "Diamante/Diamond Cappuccino Assassino" } },
-			divine = { { id = "diamond_tungtung", name = "Diamond Tung Tung Tung Sahur", model = "Diamante/Diamond Tung Sahur" } },
-			god = { { id = "diamond_cactohipopotamo", name = "Diamond Cacto Hipopotamo", model = "Diamante/Diamond Cacto Hipopotamo" } },
+			secret = { { id = "diamond_tungtung", name = "Diamond Tung Tung Tung Sahur", model = "Diamante/Diamond Tung Sahur" } },
+			divine = { { id = "diamond_cactohipopotamo", name = "Diamond Cacto Hipopotamo", model = "Diamante/Diamond Cacto Hipopotamo" } },
+			god = { { id = "diamond_cappuccino", name = "Diamond Cappuccino Assassino", model = "Diamante/Diamond Cappuccino Assassino" } },
 		},
 	},
 	{
@@ -352,8 +352,8 @@ Config.PACKS = {
 			mythic = { { id = "diamond_karkerkarkurkur", name = "Diamond Karkerkar Kurkur", model = "Diamante/Diamond Karkerkar Kurkur" }, { id = "diamond_chefcrabracadabra", name = "Diamond Chef Crabracadabra", model = "Diamante/Diamond Chef Crabracadabra" } },
 			secret = { { id = "diamond_trulimerotrulicina", name = "Diamond Trulimero Trulicina", model = "Diamante/Diamond Trulimero Trulicina" }, { id = "diamond_bombombini", name = "Diamond Bombombini Gusini", model = "Diamante/Diamond Bombombini Gusini" } },
 			divine = { { id = "diamond_cocofanto", name = "Diamond Cocofanto Elefanto", model = "Diamante/Diamond Cocofanto Elefanto" } },
-			god = { { id = "diamond_lavaca", name = "Diamond La Vaca Saturno Saturnita", model = "Diamante/Diamond La Vacca Saturno Saturnita" } },
-			og = { { id = "diamond_esoksekolah", name = "Diamond Esok Sekolah", model = "Diamante/Diamond Esok Sekolah" } },
+			god = { { id = "diamond_esoksekolah", name = "Diamond Esok Sekolah", model = "Diamante/Diamond Esok Sekolah" } },
+			og = { { id = "diamond_lavaca", name = "Diamond La Vaca Saturno Saturnita", model = "Diamante/Diamond La Vacca Saturno Saturnita" } },
 		},
 	},
 	{
@@ -384,8 +384,8 @@ Config.PACKS = {
 			mythic = { { id = "lava_fluriflura", name = "Lava Fluriflura", model = "Lava/Lava Fluri Flura" }, { id = "lava_boneca", name = "Lava Boneca Ambalabu", model = "Lava/Lava Boneca Ambalabu" } },
 			secret = { { id = "lava_bambinicrostini", name = "Lava Bambini Crostini", model = "Lava/Lava Bambini Crostini" }, { id = "lava_chillinchili", name = "Lava Chillin Chili", model = "Lava/Lava Chillin Chili" } },
 			divine = { { id = "lava_svinino", name = "Lava Svinino Bombondino", model = "Lava/Lava Svinina Bombardino" } },
-			god = { { id = "lava_chimpanzini", name = "Lava Chimpanzini Bananini", model = "Lava/Lava Chimpanzini Bananini" } },
-			og = { { id = "lava_zibrazubrazibralini", name = "Lava Zibra Zubra Zibralini", model = "Lava/Lava Zibra Zubra Zibralini" } },
+			god = { { id = "lava_zibrazubrazibralini", name = "Lava Zibra Zubra Zibralini", model = "Lava/Lava Zibra Zubra Zibralini" } },
+			og = { { id = "lava_chimpanzini", name = "Lava Chimpanzini Bananini", model = "Lava/Lava Chimpanzini Bananini" } },
 		},
 	},
 	{
@@ -400,8 +400,8 @@ Config.PACKS = {
 			secret = { { id = "lava_gorillowatermelondrillo", name = "Lava Gorillo Watermelondrillo", model = "Lava/Lava Gorillo Watermelondrillo" }, { id = "lava_nyanninicattalini", name = "Lava Nyannini Cattalini", model = "Lava/Lava Nyannini Cattalini" } },
 			divine = { { id = "lava_ballerinolololo", name = "Lava Ballerino Lololo", model = "Lava/Lava Ballerino Lololo" }, { id = "lava_trictrac", name = "Lava Tric Trac Baraboom", model = "Lava/Lava Tric Trac Barabum" } },
 			god = { { id = "lava_burbaloni", name = "Lava Burbaloni Luliloli", model = "Lava/Lava Burbaloni Luliloli" } },
-			og = { { id = "lava_odin", name = "Lava Odin Din Din Dun", model = "Lava/Lava Odin Din Din Dun" } },
-			celestial = { { id = "lava_lionelcactuseli", name = "Lava Lionel Cactuseli", model = "Lava/Lava Lioneo Cactuseli" } },
+			og = { { id = "lava_lionelcactuseli", name = "Lava Lionel Cactuseli", model = "Lava/Lava Lioneo Cactuseli" } },
+			celestial = { { id = "lava_odin", name = "Lava Odin Din Din Dun", model = "Lava/Lava Odin Din Din Dun" } },
 		},
 	},
 	{
@@ -415,9 +415,9 @@ Config.PACKS = {
 		cards = {
 			secret = { { id = "lava_karkerkarkurkur", name = "Lava Karkerkar Kurkur", model = "Lava/Lava Karkerkar Kurkur" }, { id = "lava_chefcrabracadabra", name = "Lava Chef Crabracadabra", model = "Lava/Lava Chef Crabracadabra" } },
 			divine = { { id = "lava_tralaledon", name = "Lava Tralaledon", model = "Lava/Lava Tralaledon" }, { id = "lava_girafa", name = "Lava Girafa Celestre", model = "Lava/Lava Girafa Celeste" } },
-			god = { { id = "lava_bombardiro", name = "Lava Bombardiro Crocodilo", model = "Lava/Lava Bombardiro Crocodilo" } },
+			god = { { id = "lava_sixseven", name = "Lava Six Seven", model = "Lava/Lava Six Seven" } },
 			og = { { id = "lava_noomyexamen", name = "Lava Noo My Examen", model = "Lava/Lava Noo My Examen" } },
-			celestial = { { id = "lava_sixseven", name = "Lava Six Seven", model = "Lava/Lava Six Seven" } },
+			celestial = { { id = "lava_bombardiro", name = "Lava Bombardiro Crocodilo", model = "Lava/Lava Bombardiro Crocodilo" } },
 		},
 	},
 	{
@@ -431,9 +431,9 @@ Config.PACKS = {
 		cards = {
 			secret = { { id = "lava_tatatatasahur", name = "Lava Ta Ta Ta Ta Sahur", model = "Lava/Lava Ta Ta Ta Ta Sahur" }, { id = "lava_madudung", name = "Lava Madudung", model = "Lava/Lava Madudung" } },
 			divine = { { id = "lava_dragoncannelloni", name = "Lava Dragon Cannelloni", model = "Lava/Lava Dragon Cannelloni" }, { id = "lava_espresso", name = "Lava Espresso Signora", model = "Lava/Lava Espresso Signora" } },
-			god = { { id = "lava_strawberry", name = "Lava Strawberry Elephant", model = "Lava/Lava Strawberry Elephant" } },
+			god = { { id = "lava_pothotspot", name = "Lava Pot Hotspot", model = "Lava/Lava Pot Hotspot" } },
 			og = { { id = "lava_illuminatotriangolo", name = "Lava Illuminato Triangolo", model = "Lava/Lava Illuminato Triangolo" } },
-			celestial = { { id = "lava_pothotspot", name = "Lava Pot Hotspot", model = "Lava/Lava Pot Hotspot" } },
+			celestial = { { id = "lava_strawberry", name = "Lava Strawberry Elephant", model = "Lava/Lava Strawberry Elephant" } },
 		},
 	},
 	{
@@ -448,8 +448,8 @@ Config.PACKS = {
 			divine = { { id = "galaxy_pipikiwi", name = "Galaxy Pipi Kiwi", model = "Galaxia/Galaxy Pipi Kiwi" }, { id = "galaxy_pipipotato", name = "Galaxy Pipi Potato", model = "Galaxia/Galaxy Pipi Potato" } },
 			god = { { id = "galaxy_avocadiniguffo", name = "Galaxy Avocadini Guffo", model = "Galaxia/Galaxy Avocadini Guffo" }, { id = "galaxy_bananinikittini", name = "Galaxy Bananini Kittini", model = "Galaxia/Galaxy Bananini Kittini" } },
 			og = { { id = "galaxy_patapim", name = "Galaxy Brr Brr Patapim", model = "Galaxia/Galaxy Brr Brr Patapim" } },
-			celestial = { { id = "galaxy_ballerina", name = "Galaxy Ballerina Cappuccina", model = "Galaxia/Galaxy Ballerina Cappuccina" } },
-			eternal = { { id = "galaxy_pandaccinibananini", name = "Galaxy Pandaccini Bananini", model = "Galaxia/Galaxy Pandaccini Bananini" } },
+			celestial = { { id = "galaxy_pandaccinibananini", name = "Galaxy Pandaccini Bananini", model = "Galaxia/Galaxy Pandaccini Bananini" } },
+			eternal = { { id = "galaxy_ballerina", name = "Galaxy Ballerina Cappuccina", model = "Galaxia/Galaxy Ballerina Cappuccina" } },
 		},
 	},
 	{
@@ -464,8 +464,8 @@ Config.PACKS = {
 			divine = { { id = "galaxy_gorillowatermelondrillo", name = "Galaxy Gorillo Watermelondrillo", model = "Galaxia/Galaxy Gorillo Watermelondrillo" }, { id = "galaxy_nyanninicattalini", name = "Galaxy Nyannini Cattalini", model = "Galaxia/Galaxy Nyannini Cattalini" } },
 			god = { { id = "galaxy_tralalitatralala", name = "Galaxy Tralalita Tralala", model = "Galaxia/Galaxy Tralalita Tralala" }, { id = "galaxy_rhino", name = "Galaxy Rhino Toasterino", model = "Galaxia/Galaxy Rhino Toasterino" } },
 			og = { { id = "galaxy_orangutini", name = "Galaxy Orangutini Ananassini", model = "Galaxia/Galaxy Orangutini Ananassini" } },
-			celestial = { { id = "galaxy_matteo", name = "Galaxy Matteo", model = "Galaxia/Galaxy Matteo" } },
-			eternal = { { id = "galaxy_quesadillacrocodila", name = "Galaxy Quesadilla Crocodila", model = "Galaxia/Galaxy Quesadilla Crocodila" } },
+			celestial = { { id = "galaxy_quesadillacrocodila", name = "Galaxy Quesadilla Crocodila", model = "Galaxia/Galaxy Quesadilla Crocodila" } },
+			eternal = { { id = "galaxy_matteo", name = "Galaxy Matteo", model = "Galaxia/Galaxy Matteo" } },
 		},
 	},
 	{
@@ -479,9 +479,9 @@ Config.PACKS = {
 		cards = {
 			divine = { { id = "galaxy_pakrahmatmatina", name = "Galaxy Pakrahmatmatina", model = "Galaxia/Galaxy Pakrahmatmatina" }, { id = "galaxy_torrtuginnidragonfrutini", name = "Galaxy Torrtuginni Dragonfrutini", model = "Galaxia/Galaxy Torrtuginni Dragonfrutini" } },
 			god = { { id = "galaxy_tralaledon", name = "Galaxy Tralaledon", model = "Galaxia/Galaxy Tralaledon" }, { id = "galaxy_girafa", name = "Galaxy Girafa Celestre", model = "Galaxia/Galaxy Girafa Celeste" } },
-			og = { { id = "galaxy_gangster", name = "Galaxy Gangster Footera", model = "Galaxia/Galaxy Gangster Footera" } },
+			og = { { id = "galaxy_worl", name = "Galaxy W Or L", model = "Galaxia/Galaxy W Or L" } },
 			celestial = { { id = "galaxy_yessmyexamen", name = "Galaxy Yess My Examen", model = "Galaxia/Galaxy Yess My Examen" } },
-			eternal = { { id = "galaxy_worl", name = "Galaxy W Or L", model = "Galaxia/Galaxy W Or L" } },
+			eternal = { { id = "galaxy_gangster", name = "Galaxy Gangster Footera", model = "Galaxia/Galaxy Gangster Footera" } },
 		},
 	},
 	{
@@ -495,9 +495,9 @@ Config.PACKS = {
 		cards = {
 			god = { { id = "galaxy_cavallovirtuoso", name = "Galaxy Cavallo Virtuoso", model = "Galaxia/Galaxy Cavallo Virtuoso" }, { id = "galaxy_triplitotralaleritos", name = "Galaxy Triplito Tralaleritos", model = "Galaxia/Galaxy Triplito Tralaleritos" } },
 			og = { { id = "galaxy_glorbo", name = "Galaxy Glorbo Fruttodrillo", model = "Galaxia/Galaxy Glorbo Fruttodrillo" }, { id = "galaxy_chicleteira", name = "Galaxy Chicleteira Bicicleteira", model = "Galaxia/Galaxy Chicleteira Bicicleteira" } },
-			celestial = { { id = "galaxy_strawberry", name = "Galaxy Strawberry Elephant", model = "Galaxia/Galaxy Strawberry Elephant" } },
+			celestial = { { id = "galaxy_pothotspot", name = "Galaxy Pot Hotspot", model = "Galaxia/Galaxy Pot Hotspot" } },
 			eternal = { { id = "galaxy_illuminatotriangolo", name = "Galaxy Illuminato Triangolo", model = "Galaxia/Galaxy Illuminato Triangolo" } },
-			infinity = { { id = "galaxy_pothotspot", name = "Galaxy Pot Hotspot", model = "Galaxia/Galaxy Pot Hotspot" } },
+			infinity = { { id = "galaxy_strawberry", name = "Galaxy Strawberry Elephant", model = "Galaxia/Galaxy Strawberry Elephant" } },
 		},
 	},
 	{
@@ -560,8 +560,8 @@ Config.PACKS = {
 			god = { { id = "hacker_girafa", name = "Hacker Girafa Celestre", model = "Hacker/Hacker Girafa Celeste" }, { id = "hacker_cocofanto", name = "Hacker Cocofanto Elefanto", model = "Hacker/Hacker Cocofanto Elefanto" } },
 			og = { { id = "hacker_lavaca", name = "Hacker La Vaca Saturno Saturnita", model = "Hacker/Hacker La Vacca Saturno Saturnita" }, { id = "hacker_yessmyexamen", name = "Hacker Yess My Examen", model = "Hacker/Hacker Yess My Examen" } },
 			celestial = { { id = "hacker_worl", name = "Hacker W Or L", model = "Hacker/Hacker W Or L" } },
-			eternal = { { id = "hacker_tatatatasahur", name = "Hacker Ta Ta Ta Ta Sahur", model = "Hacker/Hacker Ta Ta Ta Ta Sahur" } },
-			infinity = { { id = "hacker_madudung", name = "Hacker Madudung", model = "Hacker/Hacker Madudung" } },
+			eternal = { { id = "hacker_madudung", name = "Hacker Madudung", model = "Hacker/Hacker Madudung" } },
+			infinity = { { id = "hacker_tatatatasahur", name = "Hacker Ta Ta Ta Ta Sahur", model = "Hacker/Hacker Ta Ta Ta Ta Sahur" } },
 		},
 	},
 	{
@@ -613,19 +613,36 @@ function Config.packCards(packId: string): { Card }
 	return list
 end
 
--- Full art cards: the rarest cards of each pack. Their picture fills the whole card.
+-- Full art cards: the "trophy" cards, the top card of the packs that mark a step of the game.
+-- Their picture fills the whole card. Kept rare on purpose: 10 cards in the whole game.
+Config.FULL_ARTS = {
+	tralalero = true, -- Italian
+	tungtung = true, -- Chaos
+	lavaca = true, -- Sky
+	strawberry = true, -- Galaxy
+	pothotspot = true, -- Mystic
+	diamond_meowl = true, -- Diamond
+	lava_strawberry = true, -- Lava
+	galaxy_strawberry = true, -- Cosmos
+	hacker_tralaledon = true, -- Firewall
+	hacker_pothotspot = true, -- Hacker
+} :: { [string]: boolean }
+
+for cardId in Config.FULL_ARTS do
+	assert(Config.CARDS[cardId], "Unknown full art card " .. cardId)
+end
+
 function Config.isFullArt(cardId: string): boolean
-	local card = Config.CARDS[cardId]
-	local best = 0
-	for rarityId in Config.PACK[card.pack].cards do
-		best = math.max(best, Config.RARITY[rarityId].order)
-	end
-	return Config.RARITY[card.rarity].order == best
+	return Config.FULL_ARTS[cardId] == true
 end
 
 -- 2D illustrations (uploaded image ids) for the cards that have one, mainly the full arts.
 -- A card without one shows its 3D model.
 Config.CARD_ART = {} :: { [string]: number }
+
+-- Illustrations of the boosters (uploaded image ids), shown on the front of the pack instead of
+-- its round window. A pack without one keeps its drawn look.
+Config.PACK_ART = {} :: { [string]: number }
 
 -- Base chance (0-1) of pulling this exact card in its pack, before any luck or weather
 function Config.cardChance(cardId: string): number
@@ -1066,7 +1083,8 @@ Config.MODEL_HEIGHT = 9 -- bigger than a player, like in the big brainrot games
 -- with the blocky models of the free "Brainrot Pack [150+]" (137461628889541), saved in
 -- ServerStorage > AssetLibrary. id = 0: the model only exists in that library.
 Config.ASSETS = {
-	noobini = { id = 76207239035844 },
+	-- Blocky, arms down (the first one stood in a T-pose, facing backwards)
+	noobini = { id = 88328373857493 },
 	lirili = { id = 77231614368559 },
 	timcheese = { id = 104326039056736 },
 	pipikiwi = { id = 94106203385238 },
