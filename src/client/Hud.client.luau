@@ -620,6 +620,7 @@ local revealButtons = create("Frame", { AnchorPoint = Vector2.new(0.5, 1), Posit
 	create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 20) }),
 })
 local currentPack = "starter"
+local setAuto: (boolean) -> ()
 local opening = false
 local skipping = false
 local tapped: BindableEvent? = nil
@@ -627,7 +628,7 @@ button({ Size = UDim2.fromOffset(210, 56), Text = "OPEN AGAIN", BackgroundColor3
 	openPack(currentPack)
 end).Parent = revealButtons
 button({ Size = UDim2.fromOffset(160, 56), Text = "CLOSE", BackgroundColor3 = RED, ZIndex = 12 }, function()
-	autoOpen = false
+	setAuto(false)
 	reveal.Visible = false
 end).Parent = revealButtons
 -- Top right: at the bottom right it sat right on the jump button of phones
@@ -638,18 +639,131 @@ local skipButton = button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.ne
 	end
 end)
 skipButton.Parent = reveal
+local minimizeButton: TextButton
 -- AUTO (unlocked in the upgrade tree): keeps opening the same pack while there are some left
 local autoButton = button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 0, 128), Size = UDim2.fromOffset(130, 46), Text = "AUTO: OFF", BackgroundColor3 = GREY, ZIndex = 12, Visible = false }, function() end)
 autoButton.Parent = reveal
-autoButton.Activated:Connect(function()
-	autoOpen = not autoOpen
+setAuto = function(on: boolean)
+	autoOpen = on
 	local label = autoButton:FindFirstChild("Label") :: TextLabel
-	label.Text = if autoOpen then "AUTO: ON" else "AUTO: OFF"
-	setButtonColor(autoButton, if autoOpen then Color3.fromRGB(80, 200, 255) else GREY)
+	label.Text = if on then "AUTO: ON" else "AUTO: OFF"
+	setButtonColor(autoButton, if on then Color3.fromRGB(80, 200, 255) else GREY)
+	minimizeButton.Visible = on
+end
+autoButton.Activated:Connect(function()
+	setAuto(not autoOpen)
 	if autoOpen and not opening and reveal.Visible then
 		task.spawn(openPack, currentPack)
 	end
 end)
+
+-- Auto opening can be minimized: the packs keep opening without the animation and the cards
+-- pulled show in small, with their 1/X, in a list at the top right of the screen
+local autoMinimized = false
+local autoStrip = create("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 44), Size = UDim2.fromOffset(270, 40), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = DARK, BackgroundTransparency = 0.2, Visible = false, Parent = root }, {
+	corner(12),
+	stroke(2.5),
+	create("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }),
+	create("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+local stripHeader = create("Frame", { LayoutOrder = 0, Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, Parent = autoStrip })
+local stripTitle = textLabel({ Size = UDim2.new(1, -80, 1, 0), Text = "", TextXAlignment = Enum.TextXAlignment.Left, Parent = stripHeader })
+local stripOrder = 0
+local STRIP_LINES = 6
+
+local function addStripLine(pull)
+	stripOrder += 1
+	local card = Config.CARDS[pull.card]
+	local name = (if pull.variant == "normal" then "" else Config.VARIANT[pull.variant].name .. " ") .. card.name
+	-- Newest on top: the layout order goes down
+	local line = create("Frame", { LayoutOrder = -stripOrder, Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Parent = autoStrip })
+	textLabel({ Size = UDim2.new(1, -78, 1, 0), Text = name, TextColor3 = nameColor(pull.card, pull.variant), TextXAlignment = Enum.TextXAlignment.Left, Parent = line })
+	textLabel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0), Size = UDim2.new(0, 74, 1, 0), Text = "1/" .. Format.number(pull.oneIn), TextColor3 = if pull.oneIn >= 100 then Color3.fromRGB(255, 220, 80) else Color3.fromRGB(210, 210, 225), TextXAlignment = Enum.TextXAlignment.Right, Parent = line })
+	if pull.oneIn >= 100 then
+		local pop = create("UIScale", { Scale = 1.3, Parent = line })
+		TweenService:Create(pop, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	end
+	-- Only the last few lines stay
+	local lines = {}
+	for _, child in autoStrip:GetChildren() do
+		if child:IsA("Frame") and child ~= stripHeader then
+			table.insert(lines, child)
+		end
+	end
+	table.sort(lines, function(a, b)
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	for index = STRIP_LINES + 1, #lines do
+		lines[index]:Destroy()
+	end
+end
+
+local function refreshStripTitle()
+	local pack = Config.PACK[currentPack]
+	stripTitle.Text = "AUTO · " .. pack.name .. " x" .. (profile.packs[currentPack] or 0)
+	stripTitle.TextColor3 = pack.color
+end
+
+local function stopMinimized()
+	autoMinimized = false
+	autoStrip.Visible = false
+end
+
+-- Expand: back to the full opening, which goes on with the animation
+button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -38, 0.5, 0), Size = UDim2.fromOffset(34, 28), Text = "⤢", BackgroundColor3 = Color3.fromRGB(80, 200, 255) }, function()
+	stopMinimized()
+	if autoOpen and not opening then
+		task.spawn(openPack, currentPack)
+	end
+end).Parent = stripHeader
+button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(34, 28), Text = "■", BackgroundColor3 = RED }, function()
+	setAuto(false)
+	stopMinimized()
+end).Parent = stripHeader
+
+minimizeButton = button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 0, 180), Size = UDim2.fromOffset(130, 46), Text = "MINIMIZE", BackgroundColor3 = Color3.fromRGB(80, 120, 200), ZIndex = 12, Visible = false }, function()
+	if autoMinimized then
+		return
+	end
+	autoMinimized = true
+	reveal.Visible = false
+	autoStrip.Visible = true
+	refreshStripTitle()
+	task.spawn(function()
+		while autoMinimized and autoOpen do
+			-- An animated opening that was going on finishes first (hidden)
+			while opening do
+				task.wait(0.1)
+			end
+			if not autoMinimized or not autoOpen then
+				break
+			end
+			if (profile.packs[currentPack] or 0) < 1 then
+				toast("No " .. Config.PACK[currentPack].name .. " left: auto opening stopped", RED)
+				setAuto(false)
+				stopMinimized()
+				break
+			end
+			local pulls = remotes.OpenPack:InvokeServer(currentPack)
+			if pulls then
+				local order = {}
+				for _, pull in pulls do
+					table.insert(order, pull)
+				end
+				table.sort(order, function(a, b)
+					return a.oneIn < b.oneIn
+				end)
+				for _, pull in order do
+					addStripLine(pull)
+				end
+			end
+			task.wait(0.2)
+			refreshStripTitle()
+			task.wait(1.2 / (1 + Config.upgradeBonus(profile.upgrades, "openSpeed")))
+		end
+	end)
+end)
+minimizeButton.Parent = reveal
 
 local CARD_SIZE = UDim2.fromOffset(200, 280)
 local CARD_PANEL = Color3.fromRGB(35, 30, 55)
@@ -1001,10 +1115,7 @@ openPack = function(packId: string)
 			if (profile.packs[packId] or 0) > 0 then
 				task.spawn(openPack, packId)
 			else
-				autoOpen = false
-				local label = autoButton:FindFirstChild("Label") :: TextLabel
-				label.Text = "AUTO: OFF"
-				setButtonColor(autoButton, GREY)
+				setAuto(false)
 			end
 		end
 	end
