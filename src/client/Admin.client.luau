@@ -86,7 +86,7 @@ end
 ---------------------------------------------------------------------------
 -- Window
 ---------------------------------------------------------------------------
-local gui = create("ScreenGui", { Name = "Admin", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 8, Enabled = false, Parent = player:WaitForChild("PlayerGui") })
+local gui = create("ScreenGui", { Name = "Admin", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 2, Enabled = false, Parent = player:WaitForChild("PlayerGui") })
 local screen = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = gui })
 local uiScale = create("UIScale", { Parent = screen })
 local function updateScale()
@@ -103,8 +103,9 @@ if Workspace.CurrentCamera then
 end
 
 local openButton = button(screen, "🛠 ADMIN", 110, Color3.fromRGB(90, 90, 110), function() end)
-openButton.AnchorPoint = Vector2.new(1, 0.5)
-openButton.Position = UDim2.new(1, -14, 0.32, 0)
+-- Top left, under Roblox's buttons: the right side is taken by the opening's SKIP/AUTO/MINIMIZE
+openButton.AnchorPoint = Vector2.new(0, 0)
+openButton.Position = UDim2.new(0, 14, 0, 110)
 openButton.Size = UDim2.fromOffset(110, 40)
 
 local window = create("ScrollingFrame", {

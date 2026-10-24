@@ -288,7 +288,7 @@ player:GetAttributeChangedSignal("Cash"):Connect(function()
 	end
 	local popup = textLabel({
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, -210 + math.random(-40, 40), 0, 160),
+		Position = UDim2.new(0.5, -210 + math.random(-40, 40), 0, statsBar.Position.Y.Offset + 112),
 		Size = UDim2.fromOffset(200, 30),
 		Text = "+$" .. Format.number(gained),
 		TextColor3 = CASH_COLOR,
@@ -939,7 +939,7 @@ local function showPull(slot: Frame, pull)
 	-- From Epic up (or shiny): the rarity in big letters over the card, and stars
 	if rarity.order >= Config.RARITY.epic.order or pull.variant ~= "normal" then
 		local callout = if pull.variant ~= "normal" then string.upper(Config.VARIANT[pull.variant].name) .. "!" else string.upper(rarity.name) .. "!"
-		local tag = textLabel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(100, -6), Size = UDim2.fromOffset(240, 40), Text = callout, TextColor3 = color, Rotation = -6, ZIndex = 21, Parent = slot })
+		local tag = textLabel({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromOffset(100, -14), Size = UDim2.fromOffset(240, 40), Text = callout, TextColor3 = color, Rotation = -6, ZIndex = 21, Parent = slot })
 		local tagScale = create("UIScale", { Scale = 2.4, Parent = tag })
 		TweenService:Create(tagScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 		if not skipping then
@@ -949,7 +949,7 @@ local function showPull(slot: Frame, pull)
 
 	local chance = textLabel({ Position = UDim2.new(0, 0, 1, -48), Size = UDim2.new(1, 0, 0, 34), Text = "1/" .. Format.number(pull.oneIn), TextColor3 = color, ZIndex = 13, Parent = slot })
 	if pull.new then
-		textLabel({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0, -14, 0, -22), Size = UDim2.fromOffset(70, 28), Text = "NEW!", TextColor3 = Color3.fromRGB(255, 230, 80), Rotation = -12, ZIndex = 20, Parent = slot })
+		textLabel({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0, -14, 0, 252), Size = UDim2.fromOffset(70, 28), Text = "NEW!", TextColor3 = Color3.fromRGB(255, 230, 80), Rotation = -12, ZIndex = 20, Parent = slot })
 	end
 	-- The rarer the pull, the bigger the pop
 	if pull.oneIn >= 100 then
@@ -1440,9 +1440,15 @@ local gradeScores = create("Frame", { AnchorPoint = Vector2.new(0, 0.5), Positio
 	create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
 })
 local gradeTitle = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.16, 0), Size = UDim2.fromOffset(700, 44), Text = "", ZIndex = 11, Parent = gradeReveal })
-local gradeResult = textLabel({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0.5, -60, 0.48, 125), Size = UDim2.fromOffset(360, 44), Text = "", ZIndex = 12, Parent = gradeReveal })
+local gradeResult = textLabel({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0.5, -60, 0.48, 125), Size = UDim2.fromOffset(460, 44), Text = "", ZIndex = 12, Parent = gradeReveal })
 local gradeClose = button({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0.9, 0), Size = UDim2.fromOffset(160, 56), Text = "OK", BackgroundColor3 = ACCENT, ZIndex = 12 }, function()
 	gradeReveal.Visible = false
+	gradePanel.Visible = true
+end)
+-- While a grade shows, the Grading window and the top bar step aside so nothing covers it
+gradeReveal:GetPropertyChangedSignal("Visible"):Connect(function()
+	statsBar.Visible = not gradeReveal.Visible and not reveal.Visible
+	weatherLabel.Visible = statsBar.Visible
 end)
 gradeClose.Parent = gradeReveal
 
@@ -1456,6 +1462,7 @@ showGrade = function(result)
 	gradeTitle.Text = "Grading " .. displayName(cardId, variantId) .. "..."
 	gradeTitle.TextColor3 = nameColor(cardId, variantId)
 	cardFrame(gradeCardHolder, cardId, variantId, UDim2.fromScale(1, 1), 11)
+	gradePanel.Visible = false
 	gradeReveal.Visible = true
 
 	for index, criterion in Config.GRADE_CRITERIA do
@@ -1795,8 +1802,9 @@ end).Parent = towersPanel
 
 -- The main UI steps aside while the player is in a tower (Tower.client.luau draws the fight)
 local function refreshInTower()
-	root.Visible = player:GetAttribute("InTower") == nil and player:GetAttribute("TowerScreen") == nil
+	root.Visible = player:GetAttribute("InTower") == nil and player:GetAttribute("TowerScreen") == nil and player:GetAttribute("UpgradesOpen") == nil
 end
+player:GetAttributeChangedSignal("UpgradesOpen"):Connect(refreshInTower)
 player:GetAttributeChangedSignal("InTower"):Connect(refreshInTower)
 player:GetAttributeChangedSignal("TowerScreen"):Connect(refreshInTower)
 refreshInTower()
@@ -1832,6 +1840,26 @@ for order, entry in { { "base", "🏠 BASE", Color3.fromRGB(70, 140, 230) }, { "
 			panel.Visible = false
 		end
 		remotes.Teleport:FireServer(entry[1])
+		local character = player.Character
+		local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if rootPart then
+			local before = rootPart.Position
+			task.spawn(function()
+				-- Wait for the move, then put the camera behind the character so it doesn't stay
+				-- inside a booth or a wall
+				for _ = 1, 20 do
+					task.wait(0.05)
+					if (rootPart.Position - before).Magnitude > 10 then
+						break
+					end
+				end
+				local camera = Workspace.CurrentCamera
+				if camera then
+					local look = rootPart.CFrame.LookVector
+					camera.CFrame = CFrame.lookAt(rootPart.Position - look * 14 + Vector3.new(0, 7, 0), rootPart.Position + Vector3.new(0, 2, 0))
+				end
+			end)
+		end
 	end).Parent = teleportRow
 end
 

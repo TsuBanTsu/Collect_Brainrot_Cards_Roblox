@@ -141,7 +141,7 @@ textLabel({ Position = UDim2.fromOffset(0, 4), Size = UDim2.new(1, 0, 0, 46), Te
 textLabel({ Position = UDim2.new(0, 4, 1, -30), Size = UDim2.new(1, -8, 0, 24), Text = "UPGRADES", Parent = openButton })
 
 -- The tree window: dims the world behind it
-local window = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, Active = true, Visible = false, ZIndex = 5, Parent = screen })
+local window = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.35, Active = true, Visible = false, ZIndex = 5, Parent = screen })
 local cashLabel = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 64), Size = UDim2.fromOffset(500, 40), Text = "", TextColor3 = CASH_COLOR, ZIndex = 20, Parent = window })
 -- Everything inside `board` is laid out around its middle and scaled down to fit the screen
 local board = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, ZIndex = 6, Parent = window })
@@ -207,7 +207,7 @@ infoBuy = textButton({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0
 end)
 
 -- EXIT and BUY ALL at the bottom
-textButton({ AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(0.5, -12, 1, -24), Size = UDim2.fromOffset(170, 60), Text = "EXIT", BackgroundColor3 = RED, ZIndex = 20, Parent = window }, function()
+local exitButton = textButton({ AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(0.5, -12, 1, -24), Size = UDim2.fromOffset(170, 60), Text = "EXIT", BackgroundColor3 = RED, ZIndex = 20, Parent = window }, function()
 	window.Visible = false
 end)
 local buyAllButton = textButton({ AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0.5, 12, 1, -24), Size = UDim2.fromOffset(200, 60), Text = "BUY ALL", BackgroundColor3 = ACCENT, ZIndex = 20, Parent = window }, function()
@@ -264,6 +264,9 @@ showHub = function()
 	refreshInfo()
 	clearBoard()
 	buyAllButton.Visible = false
+	-- Alone under the hub, EXIT sits in the middle
+	exitButton.AnchorPoint = Vector2.new(0.5, 1)
+	exitButton.Position = UDim2.new(0.5, 0, 1, -24)
 	local have, total = 0, #Config.UPGRADE_LIST
 	for id in owned do
 		if Config.UPGRADES[id] then
@@ -296,7 +299,8 @@ local NODE_SIZE = 62
 local STEP = 33 -- distance between two hexagons of a branch, along it
 local SIDE = 27 -- zigzag: every other hexagon steps to the side
 -- Directions of the branches (degrees, 0 = right, 90 = down) for 1 to 4 branches
-local BRANCH_ANGLES = { { -90 }, { -90, 90 }, { -90, 150, 30 }, { -135, -45, 135, 45 } }
+-- Mostly sideways: screens are wider than tall (phones in landscape above all)
+local BRANCH_ANGLES = { { -90 }, { 180, 0 }, { 180, -28, 28 }, { -152, -28, 152, 28 } }
 
 local nodeViews: { [string]: { paint: (Color3) -> (), price: TextLabel, hex: TextButton } } = {}
 
@@ -329,6 +333,8 @@ showTree = function(tree: Config.UpgradeTree)
 	clearBoard()
 	table.clear(nodeViews)
 	buyAllButton.Visible = true
+	exitButton.AnchorPoint = Vector2.new(1, 1)
+	exitButton.Position = UDim2.new(0.5, -12, 1, -24)
 
 	local back, paintBack = hexagon(board, UDim2.fromOffset(0, 0), NODE_SIZE * 1.15, 7)
 	paintBack(Color3.fromRGB(255, 110, 60))
@@ -381,6 +387,11 @@ local function refreshAll()
 	end
 	refreshInfo()
 end
+
+-- The main UI (Hud.client.luau) hides while the window is open, so nothing overlaps it
+window:GetPropertyChangedSignal("Visible"):Connect(function()
+	player:SetAttribute("UpgradesOpen", if window.Visible then true else nil)
+end)
 
 openButton.Activated:Connect(function()
 	window.Visible = not window.Visible

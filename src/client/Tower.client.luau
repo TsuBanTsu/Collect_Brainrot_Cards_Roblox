@@ -288,8 +288,9 @@ local function updateScale()
 	local camera = Workspace.CurrentCamera
 	if camera then
 		local scale = math.clamp(math.min(camera.ViewportSize.X / 1280, camera.ViewportSize.Y / 720), 0.5, 1.4)
-		hudScale.Scale = scale
+		-- Size first: the autoplay screen copies both when the scale changes
 		screen.Size = UDim2.fromScale(1 / scale, 1 / scale)
+		hudScale.Scale = scale
 	end
 end
 updateScale()
@@ -616,6 +617,7 @@ local function updateAutoScale()
 	autoScreen.Size = screen.Size
 end
 hudScale:GetPropertyChangedSignal("Scale"):Connect(updateAutoScale)
+screen:GetPropertyChangedSignal("Size"):Connect(updateAutoScale)
 updateAutoScale()
 
 local autoButton = create("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.47, 0), Size = UDim2.fromOffset(84, 84), BackgroundColor3 = Color3.fromRGB(230, 70, 80), Text = "", Parent = autoScreen }, {

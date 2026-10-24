@@ -518,6 +518,16 @@ remotes.Teleport.OnServerEvent:Connect(function(player, target: any)
 		return
 	end
 	lastTeleport[player] = now
+	-- Get up from a bench first, or the character stays seated where it was
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.SeatPart then
+		local weld = humanoid.SeatPart:FindFirstChild("SeatWeld")
+		if weld then
+			weld:Destroy()
+		end
+		humanoid.Sit = false
+		task.wait()
+	end
 	character:PivotTo(goal)
 end)
 
