@@ -115,12 +115,12 @@ function Packs.open(player: Player, packId: string): ({ Pull }?, string?)
 	for index = 1, Config.CARDS_PER_PACK do
 		-- The pity guarantee applies to the last card of the pack
 		local minOrder = if pityReady and index == Config.CARDS_PER_PACK and not gotPityRarity then pityOrder else 0
-		local rarityId = rollRarity(pack, buffs.luck, minOrder)
+		local rarityId = rollRarity(pack, buffs.luck * (1 + PlayerData.bonus(profile, "luck")), minOrder)
 		if Config.RARITY[rarityId].order >= pityOrder then
 			gotPityRarity = true
 		end
 		local cardId = rollCard(pack, rarityId)
-		local variantId = rollVariant(buffs.shiny)
+		local variantId = rollVariant(buffs.shiny * (1 + PlayerData.bonus(profile, "shiny")))
 		local isNew = not profile.Index[cardId]
 		PlayerData.addCard(profile, cardId, variantId)
 		table.insert(pulls, { card = cardId, variant = variantId, oneIn = Config.oneIn(cardId, variantId), new = isNew })

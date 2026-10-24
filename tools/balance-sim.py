@@ -12,7 +12,7 @@ from pathlib import Path
 
 CONFIG = (Path(__file__).parent.parent / "src/shared/Config.luau").read_text()
 RUNS = 40
-OPEN_TIME = 2.5  # seconds to buy and open one pack
+OPEN_TIME = 6  # seconds to buy and open one pack (the opening animation included)
 HORIZON = 60 * 3600
 SPEND = 0.5  # share of the income spent on packs of the current tier
 

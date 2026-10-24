@@ -2,6 +2,7 @@
 -- (the plaza in the middle is built by Plaza.luau).
 -- Each plot has Config.STAND_COUNT stands that show the cards the player placed on them.
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
@@ -16,11 +17,14 @@ local PLOT_COUNT = 6 -- server size
 local PLOT_RADIUS = 78 -- distance from the middle of the map
 local PLOT_WIDTH = 46
 local PLOT_DEPTH = 38
-local MODEL_MAX_DEPTH = 7 -- deeper brainrot models are shrunk to fit behind the card
-local MODEL_MAX_WIDTH = 8 -- and wider ones so they don't reach the next stand (10 studs apart)
+local MODEL_HEIGHT = 6.5 -- the brainrot floating in front of its card, like a hologram
+local MODEL_HOVER = 0.8 -- how high it floats above the projector
+local MODEL_MAX_DEPTH = 4.5 -- deeper brainrot models are shrunk to fit in front of the card
+local MODEL_MAX_WIDTH = 7 -- and wider ones so they don't reach the next stand (10 studs apart)
+local CARD_SIZE = Vector3.new(4.6, 6.4, 0.12) -- the card standing at the back of the pedestal
 local FONT = Enum.Font.FredokaOne
 
-type Stand = { base: BasePart, ring: BasePart, light: PointLight, display: Model, key: string?, color: Color3, lift: number }
+type Stand = { base: BasePart, ring: BasePart, light: PointLight, display: Model, lock: BillboardGui, key: string?, color: Color3, lift: number }
 type Plot = { index: number, cframe: CFrame, model: Model, owner: Player?, stands: { Stand }, sign: TextLabel, income: TextLabel }
 
 local plots: { Plot } = {}
@@ -112,7 +116,17 @@ local function buildStand(plotModel: Model, cframe: CFrame, color: Color3, lift:
 	local display = Instance.new("Model")
 	display.Name = "Display"
 	display.Parent = plotModel
-	return { base = base, ring = ring, light = light, display = display, key = nil, color = color, lift = lift }
+	-- Shown on stands the owner hasn't unlocked yet (upgrade tree: Stand Builder)
+	local lock = Instance.new("BillboardGui")
+	lock.Size = UDim2.fromScale(5, 1.6)
+	lock.StudsOffsetWorldSpace = Vector3.new(0, 2.5, 0)
+	lock.MaxDistance = 50
+	lock.LightInfluence = 0
+	lock.Enabled = false
+	lock.Adornee = base
+	lock.Parent = plotModel
+	label(lock, { Size = UDim2.fromScale(1, 1), Text = "🔒 UPGRADES", TextColor3 = Color3.fromRGB(220, 220, 230) })
+	return { base = base, ring = ring, light = light, display = display, lock = lock, key = nil, color = color, lift = lift }
 end
 
 local function buildPlot(index: number): Plot
@@ -188,15 +202,15 @@ local function buildPlot(index: number): Plot
 		incomeStroke.Thickness = 4
 	end
 
-	-- Two rows of stands
+	-- Three rows of 4 stands (the last ones are unlocked in the upgrade tree)
 	local stands = {}
-	local perRow = math.ceil(Config.STAND_COUNT / 2)
+	local perRow = 4
 	for slot = 1, Config.STAND_COUNT do
-		local row = if slot <= perRow then 0 else 1
+		local row = (slot - 1) // perRow
 		local column = (slot - 1) % perRow
 		local x = (column - (perRow - 1) / 2) * 10
-		local z = -6 + row * 13
-		-- The back row's labels float a bit higher, so they don't sit behind the front row's
+		local z = -10 + row * 10.5
+		-- The back rows' labels float a bit higher, so they don't sit behind the front row's
 		stands[slot] = buildStand(model, cframe * CFrame.new(x, 0.6, z), color, row * 2)
 	end
 
@@ -236,40 +250,68 @@ local function showCard(stand: Stand, key: string)
 	stand.light.Color = color
 	stand.light.Enabled = true
 
-	-- The card itself, standing at the front of the pedestal
+	-- The card itself, standing up at the back of the pedestal, tilted back a little
 	local cardPart = part({
 		Name = "Card",
-		Size = Vector3.new(3, 4.2, 0.12),
-		CFrame = top * CFrame.new(0, 2.4, -2.1) * CFrame.Angles(math.rad(-12), 0, 0),
+		Size = CARD_SIZE,
+		CFrame = top * CFrame.new(0, CARD_SIZE.Y / 2 + 0.2, 2.2) * CFrame.Angles(math.rad(8), 0, 0),
 		Transparency = 1,
 		CanCollide = false,
 		CanQuery = false,
 		Parent = stand.display,
 	})
-	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
-		local gui = surfaceGui(cardPart, face, 70)
-		CardArt.build(gui, cardId, variantId, grade, nil, (Config.keyTrait(key) or {} :: any).id)
-	end
+	-- Its face is drawn by each player's client, like the cards of the UI (StandCards.client.luau)
+	cardPart:SetAttribute("CardKey", key)
+	CollectionService:AddTag(cardPart, "StandCard")
 	if variantId == "holo" or variantId == "rainbow" then
 		local sparkles = Instance.new("Sparkles")
 		sparkles.SparkleColor = color
 		sparkles.Parent = cardPart
 	end
 
-	-- The brainrot model, if it could be loaded
-	-- Set back by its own half depth so it never pokes through the card, and shrunk if
-	-- it's too deep or too wide for the pedestal
-	local model = Assets.get(cardId)
+	-- The brainrot floats in front of its card, as if the card projected it: a glowing
+	-- projector disc under it and a beam of light from the card to it
+	local projector = part({
+		Name = "Projector",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.15, 4.4, 4.4),
+		CFrame = top * CFrame.new(0, 0.08, -0.6) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = color,
+		Material = Enum.Material.Neon,
+		Transparency = 0.35,
+		CanCollide = false,
+		CanQuery = false,
+		Parent = stand.display,
+	})
+	local model = Assets.get(cardId, MODEL_HEIGHT)
 	if model then
 		local size = model:GetExtentsSize()
 		local fit = math.min(1, MODEL_MAX_DEPTH / size.Z, MODEL_MAX_WIDTH / size.X)
 		if fit < 1 then
 			model:ScaleTo(model:GetScale() * fit)
 		end
-		local depth = size.Z * fit
 		local _, yaw = top:ToOrientation()
-		model:PivotTo(CFrame.new((top * CFrame.new(0, 0, -1.6 + depth / 2)).Position) * CFrame.Angles(0, yaw, 0))
+		model:PivotTo(CFrame.new((top * CFrame.new(0, MODEL_HOVER, -0.6)).Position) * CFrame.Angles(0, yaw, 0))
 		model.Parent = stand.display
+		-- Bobs gently on the player's screen (Ambient.client.luau)
+		CollectionService:AddTag(model, "AmbientHover")
+
+		local from = Instance.new("Attachment")
+		from.Parent = cardPart
+		local to = Instance.new("Attachment")
+		to.Parent = projector
+		to.WorldPosition = (top * CFrame.new(0, MODEL_HOVER + size.Y * fit / 2, -0.6)).Position
+		local beam = Instance.new("Beam")
+		beam.Attachment0 = from
+		beam.Attachment1 = to
+		beam.Width0 = CARD_SIZE.X * 0.8
+		beam.Width1 = math.max(2, size.X * fit)
+		beam.FaceCamera = true
+		beam.Color = ColorSequence.new(color)
+		beam.LightEmission = 1
+		beam.Transparency = NumberSequence.new(0.75, 0.9)
+		beam.Segments = 1
+		beam.Parent = cardPart
 	end
 
 	-- Sparkles around rare cards and shiny variants
@@ -290,7 +332,7 @@ local function showCard(stand: Stand, key: string)
 	-- Sized in studs: it gets smaller with distance, so the 8 labels of a plot don't pile up
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.fromScale(7, 2.8)
-	billboard.StudsOffsetWorldSpace = Vector3.new(0, Config.MODEL_HEIGHT + 4 + stand.lift, 0)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, CARD_SIZE.Y + 3.5 + stand.lift, 0)
 	billboard.MaxDistance = 40
 	billboard.LightInfluence = 0
 	billboard.Adornee = stand.base
@@ -357,17 +399,19 @@ function Plots.release(player: Player)
 	plot.income.Text = ""
 	for _, stand in plot.stands do
 		setStand(stand, nil)
+		stand.lock.Enabled = false
 	end
 end
 
--- Shows the player's stands as saved in their profile
-function Plots.refresh(player: Player, stands: { [string]: string })
+-- Shows the player's stands as saved in their profile; stands past `unlocked` show a lock
+function Plots.refresh(player: Player, stands: { [string]: string }, unlocked: number)
 	local plot = plotOf(player)
 	if not plot then
 		return
 	end
 	for slot, stand in plot.stands do
 		setStand(stand, stands[tostring(slot)])
+		stand.lock.Enabled = slot > unlocked
 	end
 end
 

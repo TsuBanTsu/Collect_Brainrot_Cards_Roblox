@@ -15,6 +15,10 @@ function Format.number(n: number): string
 		return string.format("%.1f", n)
 	end
 	local index = math.floor(math.log10(math.abs(n)) / 3)
+	-- 999,998,084 would round to "1000M": write it "1B"
+	if math.abs(n) / 1000 ^ index >= 999.995 then
+		index += 1
+	end
 	if index >= #SUFFIXES then
 		return string.format("%.2e", n)
 	end

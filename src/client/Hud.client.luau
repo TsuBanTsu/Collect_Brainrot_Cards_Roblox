@@ -8,6 +8,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 local GuiService = game:GetService("GuiService")
+local SoundService = game:GetService("SoundService")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
@@ -29,7 +30,8 @@ local CASH_COLOR = Color3.fromRGB(120, 255, 140)
 local GREY = Color3.fromRGB(110, 110, 125)
 
 local refreshTowers: () -> ()
-local profile = { cards = {}, stands = {}, packs = {}, backpackLevel = 0, index = {}, pity = {}, dailyDay = 0, dailyStreak = 0, team = {}, towers = {}, traitRerolls = 0 }
+local profile = { cards = {}, stands = {}, packs = {}, backpackLevel = 0, index = {}, pity = {}, dailyDay = 0, dailyStreak = 0, team = {}, towers = {}, traitRerolls = 0, upgrades = {}, standCount = Config.BASE_STANDS }
+local autoOpen = false -- pack opening: AUTO is on (upgrade tree)
 
 ---------------------------------------------------------------------------
 -- Small helpers to build the UI
@@ -286,7 +288,7 @@ player:GetAttributeChangedSignal("Cash"):Connect(function()
 	end
 	local popup = textLabel({
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, -210 + math.random(-40, 40), 0, 160),
+		Position = UDim2.new(0.5, -210 + math.random(-40, 40), 0, statsBar.Position.Y.Offset + 112),
 		Size = UDim2.fromOffset(200, 30),
 		Text = "+$" .. Format.number(gained),
 		TextColor3 = CASH_COLOR,
@@ -618,6 +620,7 @@ local revealButtons = create("Frame", { AnchorPoint = Vector2.new(0.5, 1), Posit
 	create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 20) }),
 })
 local currentPack = "starter"
+local setAuto: (boolean) -> ()
 local opening = false
 local skipping = false
 local tapped: BindableEvent? = nil
@@ -625,15 +628,142 @@ button({ Size = UDim2.fromOffset(210, 56), Text = "OPEN AGAIN", BackgroundColor3
 	openPack(currentPack)
 end).Parent = revealButtons
 button({ Size = UDim2.fromOffset(160, 56), Text = "CLOSE", BackgroundColor3 = RED, ZIndex = 12 }, function()
+	setAuto(false)
 	reveal.Visible = false
 end).Parent = revealButtons
-local skipButton = button({ AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -30, 0.94, 0), Size = UDim2.fromOffset(130, 50), Text = "SKIP", BackgroundColor3 = GREY, ZIndex = 12, Visible = false }, function()
+-- Top right: at the bottom right it sat right on the jump button of phones
+local skipButton = button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 0, 70), Size = UDim2.fromOffset(130, 50), Text = "SKIP ⏩", BackgroundColor3 = GREY, ZIndex = 12, Visible = false }, function()
 	skipping = true
 	if tapped then
 		tapped:Fire()
 	end
 end)
 skipButton.Parent = reveal
+local minimizeButton: TextButton
+-- AUTO (unlocked in the upgrade tree): keeps opening the same pack while there are some left
+local autoButton = button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 0, 128), Size = UDim2.fromOffset(130, 46), Text = "AUTO: OFF", BackgroundColor3 = GREY, ZIndex = 12, Visible = false }, function() end)
+autoButton.Parent = reveal
+setAuto = function(on: boolean)
+	autoOpen = on
+	local label = autoButton:FindFirstChild("Label") :: TextLabel
+	label.Text = if on then "AUTO: ON" else "AUTO: OFF"
+	setButtonColor(autoButton, if on then Color3.fromRGB(80, 200, 255) else GREY)
+	minimizeButton.Visible = on
+end
+autoButton.Activated:Connect(function()
+	setAuto(not autoOpen)
+	if autoOpen and not opening and reveal.Visible then
+		task.spawn(openPack, currentPack)
+	end
+end)
+
+-- Auto opening can be minimized: the packs keep opening without the animation and the cards
+-- pulled show in small, with their 1/X, in a list at the top right of the screen
+local autoMinimized = false
+local autoStrip = create("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 44), Size = UDim2.fromOffset(270, 40), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = DARK, BackgroundTransparency = 0.2, Visible = false, Parent = root }, {
+	corner(12),
+	stroke(2.5),
+	create("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }),
+	create("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+local stripHeader = create("Frame", { LayoutOrder = 0, Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, Parent = autoStrip })
+local stripTitle = textLabel({ Size = UDim2.new(1, -80, 1, 0), Text = "", TextXAlignment = Enum.TextXAlignment.Left, Parent = stripHeader })
+local stripOrder = 0
+local STRIP_LINES = 6
+
+local function addStripLine(pull)
+	stripOrder += 1
+	local card = Config.CARDS[pull.card]
+	local name = (if pull.variant == "normal" then "" else Config.VARIANT[pull.variant].name .. " ") .. card.name
+	-- Newest on top: the layout order goes down
+	local line = create("Frame", { LayoutOrder = -stripOrder, Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Parent = autoStrip })
+	textLabel({ Size = UDim2.new(1, -78, 1, 0), Text = name, TextColor3 = nameColor(pull.card, pull.variant), TextXAlignment = Enum.TextXAlignment.Left, Parent = line })
+	textLabel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0), Size = UDim2.new(0, 74, 1, 0), Text = "1/" .. Format.number(pull.oneIn), TextColor3 = if pull.oneIn >= 100 then Color3.fromRGB(255, 220, 80) else Color3.fromRGB(210, 210, 225), TextXAlignment = Enum.TextXAlignment.Right, Parent = line })
+	if pull.oneIn >= 100 then
+		local pop = create("UIScale", { Scale = 1.3, Parent = line })
+		TweenService:Create(pop, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	end
+	-- Only the last few lines stay
+	local lines = {}
+	for _, child in autoStrip:GetChildren() do
+		if child:IsA("Frame") and child ~= stripHeader then
+			table.insert(lines, child)
+		end
+	end
+	table.sort(lines, function(a, b)
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	for index = STRIP_LINES + 1, #lines do
+		lines[index]:Destroy()
+	end
+end
+
+local function refreshStripTitle()
+	local pack = Config.PACK[currentPack]
+	stripTitle.Text = "AUTO · " .. pack.name .. " x" .. (profile.packs[currentPack] or 0)
+	stripTitle.TextColor3 = pack.color
+end
+
+local function stopMinimized()
+	autoMinimized = false
+	autoStrip.Visible = false
+end
+
+-- Expand: back to the full opening, which goes on with the animation
+button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -38, 0.5, 0), Size = UDim2.fromOffset(34, 28), Text = "⤢", BackgroundColor3 = Color3.fromRGB(80, 200, 255) }, function()
+	stopMinimized()
+	if autoOpen and not opening then
+		task.spawn(openPack, currentPack)
+	end
+end).Parent = stripHeader
+button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(34, 28), Text = "■", BackgroundColor3 = RED }, function()
+	setAuto(false)
+	stopMinimized()
+end).Parent = stripHeader
+
+minimizeButton = button({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 0, 180), Size = UDim2.fromOffset(130, 46), Text = "MINIMIZE", BackgroundColor3 = Color3.fromRGB(80, 120, 200), ZIndex = 12, Visible = false }, function()
+	if autoMinimized then
+		return
+	end
+	autoMinimized = true
+	reveal.Visible = false
+	autoStrip.Visible = true
+	refreshStripTitle()
+	task.spawn(function()
+		while autoMinimized and autoOpen do
+			-- An animated opening that was going on finishes first (hidden)
+			while opening do
+				task.wait(0.1)
+			end
+			if not autoMinimized or not autoOpen then
+				break
+			end
+			if (profile.packs[currentPack] or 0) < 1 then
+				toast("No " .. Config.PACK[currentPack].name .. " left: auto opening stopped", RED)
+				setAuto(false)
+				stopMinimized()
+				break
+			end
+			local pulls = remotes.OpenPack:InvokeServer(currentPack)
+			if pulls then
+				local order = {}
+				for _, pull in pulls do
+					table.insert(order, pull)
+				end
+				table.sort(order, function(a, b)
+					return a.oneIn < b.oneIn
+				end)
+				for _, pull in order do
+					addStripLine(pull)
+				end
+			end
+			task.wait(0.2)
+			refreshStripTitle()
+			task.wait(1.2 / (1 + Config.upgradeBonus(profile.upgrades, "openSpeed")))
+		end
+	end)
+end)
+minimizeButton.Parent = reveal
 
 local CARD_SIZE = UDim2.fromOffset(200, 280)
 local CARD_PANEL = Color3.fromRGB(35, 30, 55)
@@ -679,6 +809,85 @@ local function shake(target: GuiObject, times: number, angle: number)
 	target.Rotation = 0
 end
 
+-- Built-in Roblox sounds (no upload needed)
+local SOUNDS = {
+	tear = { id = "rbxasset://sounds/swordslash.wav", volume = 0.6, pitch = 1.3 },
+	whoosh = { id = "rbxasset://sounds/swordlunge.wav", volume = 0.35, pitch = 1.4 },
+	flip = { id = "rbxasset://sounds/clickfast.wav", volume = 0.7, pitch = 1 },
+	rare = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.6, pitch = 1 },
+	tick = { id = "rbxasset://sounds/button.wav", volume = 0.4, pitch = 1.6 },
+}
+local soundCache: { [string]: Sound } = {}
+local function sfx(name: string, pitch: number?)
+	local info = SOUNDS[name]
+	local sound = soundCache[name]
+	if not sound then
+		sound = Instance.new("Sound")
+		sound.SoundId = info.id
+		sound.Volume = info.volume
+		sound.Parent = SoundService
+		soundCache[name] = sound
+	end
+	local copy = sound:Clone()
+	copy.PlaybackSpeed = (pitch or 1) * info.pitch
+	copy.Parent = SoundService
+	copy:Play()
+	task.delay(3, function()
+		copy:Destroy()
+	end)
+end
+
+-- Little stars bursting out of a point of `parent` (a pack tearing, a rare card landing)
+local function burst(parent: GuiObject, center: UDim2, color: Color3, amount: number, distance: number)
+	for _ = 1, amount do
+		local angle = math.random() * math.pi * 2
+		local far = distance * (0.5 + math.random() * 0.7)
+		local star = textLabel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = center, Size = UDim2.fromOffset(26, 26), Text = if math.random() < 0.5 then "✦" else "★", TextColor3 = color:Lerp(Color3.new(1, 1, 1), math.random() * 0.5), Rotation = math.random(0, 360), ZIndex = 25, Parent = parent })
+		local goal = center + UDim2.fromOffset(math.cos(angle) * far, math.sin(angle) * far)
+		TweenService:Create(star, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = goal, Rotation = star.Rotation + 180, TextTransparency = 1 }):Play()
+		local outline = star:FindFirstChildOfClass("UIStroke")
+		if outline then
+			TweenService:Create(outline, TweenInfo.new(0.7), { Transparency = 1 }):Play()
+		end
+		task.delay(0.75, function()
+			star:Destroy()
+		end)
+	end
+end
+
+-- Confetti raining over the whole screen (the rarest pulls)
+local function confetti(colors: { Color3 }, amount: number)
+	for i = 1, amount do
+		local piece = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(math.random(), 0, -0.05, 0), Size = UDim2.fromOffset(math.random(10, 18), math.random(6, 10)), Rotation = math.random(0, 360), BackgroundColor3 = colors[(i - 1) % #colors + 1], BorderSizePixel = 0, ZIndex = 28, Parent = reveal })
+		local fall = 1.6 + math.random() * 1.4
+		TweenService:Create(piece, TweenInfo.new(fall, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { Position = UDim2.new(piece.Position.X.Scale + (math.random() - 0.5) * 0.3, 0, 1.08, 0), Rotation = piece.Rotation + math.random(-540, 540) }):Play()
+		task.delay(fall, function()
+			piece:Destroy()
+		end)
+	end
+end
+
+-- The whole reveal shakes for a moment
+local function screenShake(duration: number, strength: number)
+	task.spawn(function()
+		local started = os.clock()
+		while os.clock() - started < duration do
+			local fade = 1 - (os.clock() - started) / duration
+			reveal.Position = UDim2.fromOffset((math.random() - 0.5) * strength * fade, (math.random() - 0.5) * strength * fade)
+			task.wait(1 / 30)
+		end
+		reveal.Position = UDim2.fromOffset(0, 0)
+	end)
+end
+
+-- Upgrade tree: openings play faster (Quick Hands...)
+local function openSpeed(): number
+	return 1 + Config.upgradeBonus(profile.upgrades, "openSpeed")
+end
+local function pause(seconds: number)
+	task.wait(seconds / openSpeed())
+end
+
 local function showPull(slot: Frame, pull)
 	local holder = slot:FindFirstChild("Holder") :: Frame
 	local back = holder:FindFirstChild("Back") :: Frame
@@ -689,12 +898,13 @@ local function showPull(slot: Frame, pull)
 	if not skipping and (rarity.order >= Config.RARITY.epic.order or pull.variant ~= "normal") then
 		TweenService:Create(back, TweenInfo.new(0.3), { BackgroundColor3 = color }):Play()
 		create("UIStroke", { Thickness = 6, Color = color, Transparency = 0.2, Parent = back })
+		sfx("tick", 0.8 + math.min(rarity.order, 10) * 0.08)
 		shake(holder, if pull.oneIn >= 1000 then 14 else 7, if pull.oneIn >= 1000 then 6 else 3)
 	end
 	-- Very rare pulls: the screen goes dark for a moment before the flip
 	if not skipping and pull.oneIn >= 10000 then
 		TweenService:Create(reveal, TweenInfo.new(0.4), { BackgroundTransparency = 0.02 }):Play()
-		task.wait(0.8)
+		pause(0.8)
 	end
 
 	-- Flip: shrink the back to nothing, then grow the real card
@@ -707,10 +917,39 @@ local function showPull(slot: Frame, pull)
 	end
 	cardFrame(holder, pull.card, pull.variant, UDim2.fromScale(1, 1), 12)
 	TweenService:Create(holder, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = CARD_SIZE }):Play()
+	sfx(if pull.oneIn >= 100 or pull.variant ~= "normal" then "rare" else "flip", if pull.oneIn >= 1000 then 0.8 else 1)
+
+	-- A glow in the card's color behind it, stronger for rarer cards
+	local glowStrength = math.clamp(rarity.order / 8, 0.25, 1)
+	local glow = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(100, 140), Size = UDim2.fromOffset(200, 280), BackgroundTransparency = 1, ZIndex = 11, Parent = slot }, {
+		create("UICorner", { CornerRadius = UDim.new(0.08, 0) }),
+		create("UIStroke", { Thickness = 10, Color = color, Transparency = 1 - glowStrength * 0.8 }),
+	})
+	local glowScale = create("UIScale", { Scale = 0.9, Parent = glow })
+	TweenService:Create(glowScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1.06 }):Play()
+	task.spawn(function()
+		while glow.Parent do
+			TweenService:Create(glowScale, TweenInfo.new(0.8, Enum.EasingStyle.Sine), { Scale = 1.1 }):Play()
+			pause(0.8)
+			TweenService:Create(glowScale, TweenInfo.new(0.8, Enum.EasingStyle.Sine), { Scale = 1.03 }):Play()
+			pause(0.8)
+		end
+	end)
+
+	-- From Epic up (or shiny): the rarity in big letters over the card, and stars
+	if rarity.order >= Config.RARITY.epic.order or pull.variant ~= "normal" then
+		local callout = if pull.variant ~= "normal" then string.upper(Config.VARIANT[pull.variant].name) .. "!" else string.upper(rarity.name) .. "!"
+		local tag = textLabel({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromOffset(100, -14), Size = UDim2.fromOffset(240, 40), Text = callout, TextColor3 = color, Rotation = -6, ZIndex = 21, Parent = slot })
+		local tagScale = create("UIScale", { Scale = 2.4, Parent = tag })
+		TweenService:Create(tagScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+		if not skipping then
+			burst(slot, UDim2.fromOffset(100, 140), color, if pull.oneIn >= 1000 then 22 else 12, if pull.oneIn >= 1000 then 260 else 170)
+		end
+	end
 
 	local chance = textLabel({ Position = UDim2.new(0, 0, 1, -48), Size = UDim2.new(1, 0, 0, 34), Text = "1/" .. Format.number(pull.oneIn), TextColor3 = color, ZIndex = 13, Parent = slot })
 	if pull.new then
-		textLabel({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0, -14, 0, -22), Size = UDim2.fromOffset(70, 28), Text = "NEW!", TextColor3 = Color3.fromRGB(255, 230, 80), Rotation = -12, ZIndex = 20, Parent = slot })
+		textLabel({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0, -14, 0, 252), Size = UDim2.fromOffset(70, 28), Text = "NEW!", TextColor3 = Color3.fromRGB(255, 230, 80), Rotation = -12, ZIndex = 20, Parent = slot })
 	end
 	-- The rarer the pull, the bigger the pop
 	if pull.oneIn >= 100 then
@@ -725,6 +964,10 @@ local function showPull(slot: Frame, pull)
 			flash:Destroy()
 		end)
 		task.spawn(shake, holder, 8, 4)
+		if not skipping then
+			screenShake(0.5, 18)
+			confetti({ color, rarity.color, Color3.fromRGB(255, 230, 80), Color3.new(1, 1, 1) }, if pull.oneIn >= 10000 then 90 else 50)
+		end
 	end
 	if pull.oneIn >= 10000 then
 		TweenService:Create(reveal, TweenInfo.new(0.6), { BackgroundTransparency = 0.2 }):Play()
@@ -738,6 +981,9 @@ local function tearPack(pack: Config.Pack)
 	packStage.Rotation = 0
 	packStage.Position = UDim2.fromScale(0.5, 0.52)
 	local art = PackArt.build(packStage, pack, 12)
+	-- Light rays in the pack's color turn behind it
+	local packRays = create("Frame", { Name = "Rays", Size = UDim2.fromOffset(200, 280), Position = UDim2.fromOffset(50, 70), BackgroundTransparency = 1, ZIndex = 10, Parent = packStage })
+	rays(packRays, pack.color)
 	local scale = create("UIScale", { Scale = 0.3, Parent = packStage })
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 
@@ -757,7 +1003,7 @@ local function tearPack(pack: Config.Pack)
 			task.wait(1 / 30)
 		end
 	end)
-	task.delay(4, function()
+	task.delay(if autoOpen then 0.3 else 4 / openSpeed(), function()
 		event:Fire()
 	end)
 	if not skipping then
@@ -771,11 +1017,41 @@ local function tearPack(pack: Config.Pack)
 	scale:Destroy()
 
 	if not skipping then
-		local top = art:FindFirstChild("Top") :: Frame
-		TweenService:Create(top, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.new(0.3, 0, -0.6, 0), Rotation = -35 }):Play()
-		task.wait(0.25)
+		local packRaysNow = packStage:FindFirstChild("Rays")
+		if packRaysNow then
+			packRaysNow:Destroy()
+		end
+		-- The top tears off in one strip, from left to right: the torn part peels up a little
+		-- more as the tear goes, leaving a ragged white edge on the bag, then comes off
+		local duration = 0.6 / openSpeed()
+		local started = os.clock()
+		local nextTick = 0
+		local top: Frame = PackArt.setTear(art, 0)
+		while true do
+			local progress = math.min(1, (os.clock() - started) / duration)
+			-- Slow at first, then faster, like pulling foil
+			top = PackArt.setTear(art, progress * progress * (3 - 2 * progress))
+			if progress >= nextTick then
+				sfx("tick", 0.7 + progress * 0.5)
+				burst(packStage, UDim2.fromScale(progress, 0.07), Color3.new(1, 1, 1), 1, 40)
+				nextTick += 0.2
+			end
+			if progress >= 1 then
+				break
+			end
+			task.wait()
+		end
+		sfx("tear")
+		TweenService:Create(top, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.new(0.6, 0, -0.9, 0), Rotation = 25 }):Play()
+		-- Light pours out of the open top
+		local glow = create("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.07), Size = UDim2.new(0.9, 0, 0, 10), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 30, Parent = packStage }, {
+			create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		})
+		TweenService:Create(glow, TweenInfo.new(0.35), { Size = UDim2.new(1.3, 0, 0, 60), BackgroundTransparency = 1 }):Play()
+		burst(reveal, UDim2.fromScale(0.5, 0.25), pack.color, 12, 200)
+		pause(0.35)
 		TweenService:Create(packStage, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.fromScale(0.5, 1.4) }):Play()
-		task.wait(0.2)
+		pause(0.2)
 	end
 	task.delay(0.4, function()
 		clearList(packStage)
@@ -809,6 +1085,7 @@ openPack = function(packId: string)
 	reveal.BackgroundTransparency = 0.2
 	reveal.Visible = true
 	skipButton.Visible = true
+	autoButton.Visible = Config.upgradeBonus(profile.upgrades, "autoOpen") > 0
 
 	tearPack(pack)
 
@@ -816,12 +1093,15 @@ openPack = function(packId: string)
 	local slots = {}
 	for index in pulls do
 		local slot = create("Frame", { LayoutOrder = index, Size = UDim2.fromOffset(200, 340), BackgroundTransparency = 1, ZIndex = 11, Parent = revealRow })
-		local holder = create("Frame", { Name = "Holder", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, (2 - index) * 230, 0, 260), Size = UDim2.fromOffset(60, 84), BackgroundTransparency = 1, ZIndex = 12, Parent = slot })
+		local holder = create("Frame", { Name = "Holder", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, (2 - index) * 230, 0, 60), Size = UDim2.fromOffset(60, 84), Rotation = (index - 2) * 40 + 180, BackgroundTransparency = 1, ZIndex = 12, Parent = slot })
 		cardBack(holder, pack)
-		TweenService:Create(holder, TweenInfo.new(if skipping then 0.01 else 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0), Size = CARD_SIZE }):Play()
+		if not skipping then
+			sfx("whoosh", 0.9 + index * 0.1)
+		end
+		TweenService:Create(holder, TweenInfo.new(if skipping then 0.01 else 0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0.5, 0), Size = CARD_SIZE, Rotation = 0 }):Play()
 		slots[index] = slot
 		if not skipping then
-			task.wait(0.12)
+			pause(0.12)
 		end
 	end
 	-- Rarest card last, for suspense
@@ -832,16 +1112,26 @@ openPack = function(packId: string)
 	table.sort(order, function(a, b)
 		return pulls[a].oneIn < pulls[b].oneIn
 	end)
-	task.wait(if skipping then 0.05 else 0.5)
+	pause(if skipping then 0.05 else 0.5)
 	for _, index in order do
 		showPull(slots[index], pulls[index])
 		if not skipping then
-			task.wait(if pulls[index].oneIn >= 1000 then 1 else 0.45)
+			pause(if pulls[index].oneIn >= 1000 then 1 else 0.45)
 		end
 	end
 	skipButton.Visible = false
 	revealButtons.Visible = true
 	opening = false
+	if autoOpen then
+		task.wait(0.8)
+		if autoOpen and reveal.Visible and not opening then
+			if (profile.packs[packId] or 0) > 0 then
+				task.spawn(openPack, packId)
+			else
+				setAuto(false)
+			end
+		end
+	end
 end
 
 -- While a pack opens, the top bar steps aside; while any window is open, the shopkeepers'
@@ -849,8 +1139,12 @@ end
 reveal:GetPropertyChangedSignal("Visible"):Connect(function()
 	statsBar.Visible = not reveal.Visible
 	weatherLabel.Visible = not reveal.Visible
+	-- Phones: the thumbstick and jump button hide while a pack opens, so no tap lands on them
+	GuiService.TouchControlsEnabled = not reveal.Visible
 end)
 local hotbarHidden = false
+local windowOpen = false -- a pack opening or any window is on screen
+local refreshOpenHeld: () -> () -- the OPEN PACK button, set up further down
 task.spawn(function()
 	while true do
 		local covered = reveal.Visible
@@ -859,6 +1153,10 @@ task.spawn(function()
 		end
 		for _, tag in CollectionService:GetTagged("HideUnderUi") do
 			(tag :: BillboardGui).Enabled = not covered
+		end
+		if covered ~= windowOpen then
+			windowOpen = covered
+			refreshOpenHeld()
 		end
 		-- The Roblox hotbar would cover the bottom of the windows (on phones above all)
 		if covered ~= hotbarHidden then
@@ -880,10 +1178,11 @@ local openHeld = button({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.ne
 	end
 end)
 openHeld.Parent = root
--- During the opening: no OPEN PACK button
-reveal:GetPropertyChangedSignal("Visible"):Connect(function()
-	openHeld.Visible = heldPack ~= nil and not reveal.Visible
-end)
+-- During an opening or while a window (shop, My Packs...) is open: no OPEN PACK button
+function refreshOpenHeld()
+	openHeld.Visible = heldPack ~= nil and not windowOpen and not reveal.Visible
+end
+reveal:GetPropertyChangedSignal("Visible"):Connect(refreshOpenHeld)
 
 local function watchTool(tool: Instance)
 	local packId = tool:IsA("Tool") and tool:GetAttribute("PackId")
@@ -897,12 +1196,12 @@ local function watchTool(tool: Instance)
 	end)
 	t.Equipped:Connect(function()
 		heldPack = packId
-		openHeld.Visible = not reveal.Visible
+		refreshOpenHeld()
 	end)
 	t.Unequipped:Connect(function()
 		if heldPack == packId then
 			heldPack = nil
-			openHeld.Visible = false
+			refreshOpenHeld()
 		end
 	end)
 end
@@ -925,7 +1224,7 @@ if backpackFolder then
 end
 player.CharacterAdded:Connect(function(character)
 	heldPack = nil
-	openHeld.Visible = false
+	refreshOpenHeld()
 	watchContainer(character)
 end)
 if player.Character then
@@ -963,7 +1262,7 @@ local function refreshCards()
 			inBackpack += count
 		end
 	end
-	backpackTitle.Text = string.format("Backpack %d/%d (cards and packs)", inBackpack, Config.backpackSize(profile.backpackLevel or 0))
+	backpackTitle.Text = string.format("Backpack %d/%d (cards and packs)", inBackpack, player:GetAttribute("BackpackSize") or Config.backpackSize(profile.backpackLevel or 0))
 	local keys = sortedKeys(profile.cards)
 	-- Every card is a little 3D scene: only rebuild the grid when the cards really changed
 	local signature = {}
@@ -1006,7 +1305,7 @@ local function refreshCards()
 
 	clearList(standsList)
 	local used = 0
-	for slot = 1, Config.STAND_COUNT do
+	for slot = 1, profile.standCount or Config.BASE_STANDS do
 		local key = profile.stands[tostring(slot)]
 		if key then
 			used += 1
@@ -1022,7 +1321,7 @@ local function refreshCards()
 			})
 		end
 	end
-	standsTitle.Text = string.format("Stands %d/%d", used, Config.STAND_COUNT)
+	standsTitle.Text = string.format("Stands %d/%d", used, profile.standCount or Config.BASE_STANDS)
 end
 
 ---------------------------------------------------------------------------
@@ -1032,6 +1331,11 @@ local SELL_COLOR = Color3.fromRGB(255, 190, 60)
 local sellPanel = makePanel("Sell", "SELL", SELL_COLOR, Vector2.new(760, 500))
 textLabel({ Position = UDim2.fromOffset(16, 60), Size = UDim2.new(1, -32, 0, 22), Text = "Rarer and shinier cards sell for more. Cards on your stands can't be sold.", TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = sellPanel })
 local sellList = scrollingList({ Position = UDim2.fromOffset(12, 92), Size = UDim2.new(1, -24, 1, -104), Parent = sellPanel })
+
+-- Sell prices with the upgrade tree's bonus
+local function sellBonus(): number
+	return 1 + Config.upgradeBonus(profile.upgrades, "sell")
+end
 
 -- A row with "SELL 1" and "SELL ALL" buttons
 local function sellRow(order: number, title: string, color: Color3, info: string, count: number, onSell: (number) -> ())
@@ -1055,7 +1359,7 @@ local function refreshSell()
 		local count = profile.packs[pack.id] or 0
 		if count > 0 then
 			order += 1
-			sellRow(order, pack.name, pack.color, "$" .. Format.number(Config.packSellPrice(pack.id)) .. " each", count, function(amount)
+			sellRow(order, pack.name, pack.color, "$" .. Format.number(math.floor(Config.packSellPrice(pack.id) * sellBonus())) .. " each", count, function(amount)
 				remotes.SellPack:FireServer(pack.id, amount)
 			end)
 		end
@@ -1066,7 +1370,7 @@ local function refreshSell()
 		local key = keys[i]
 		local cardId, variantId = Config.splitKey(key)
 		order += 1
-		sellRow(order, keyName(key), nameColor(cardId, variantId), "$" .. Format.number(Config.sellPrice(key)) .. " each", profile.cards[key], function(amount)
+		sellRow(order, keyName(key), nameColor(cardId, variantId), "$" .. Format.number(math.floor(Config.sellPrice(key) * sellBonus())) .. " each", profile.cards[key], function(amount)
 			remotes.SellCard:FireServer(key, amount)
 		end)
 	end
@@ -1097,35 +1401,48 @@ local grading = false
 local function refreshGrade()
 	clearList(gradeList)
 	local order = 0
-	for _, key in sortedKeys(profile.cards) do
-		local cardId, variantId, scores = Config.splitKey(key)
-		if not scores then
-			order += 1
-			local cost = Config.gradeCost(cardId, variantId)
-			local row = create("Frame", { LayoutOrder = order, Size = UDim2.new(1, -10, 0, 48), BackgroundColor3 = PANEL, Parent = gradeList }, { corner(8), stroke(1.5) })
-			local count = profile.cards[key]
-			textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -220, 0, 22), Text = keyName(key) .. (if count > 1 then "  x" .. count else ""), TextColor3 = nameColor(cardId, variantId), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-			textLabel({ Position = UDim2.fromOffset(10, 26), Size = UDim2.new(1, -220, 0, 18), Text = "$" .. Format.number(Config.keyIncome(key)) .. "/s", TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-			local canPay = (player:GetAttribute("Cash") or 0) >= cost
-			button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(190, 36), Text = "GRADE $" .. Format.number(cost), BackgroundColor3 = if canPay then GRADE_COLOR else GREY }, function()
-				if grading then
-					return
-				end
-				if (player:GetAttribute("Cash") or 0) < cost then
-					toast("Not enough Cash to grade this card", RED)
-					return
-				end
-				grading = true
-				local result = remotes.Grade:InvokeServer(key)
-				if result then
-					showGrade(result)
-				end
-				grading = false
-			end).Parent = row
+	-- Cards not graded yet first, then the graded ones (a reroll keeps the better grade)
+	local keys = sortedKeys(profile.cards)
+	local rank = {}
+	for index, key in keys do
+		rank[key] = index + (if Config.keyGrade(key) then #keys else 0)
+	end
+	table.sort(keys, function(a, b)
+		return rank[a] < rank[b]
+	end)
+	for _, key in keys do
+		local cardId, variantId = Config.splitKey(key)
+		local grade = Config.keyGrade(key)
+		order += 1
+		local cost = if grade then Config.regradeCost(cardId, variantId) else Config.gradeCost(cardId, variantId)
+		local row = create("Frame", { LayoutOrder = order, Size = UDim2.new(1, -10, 0, 48), BackgroundColor3 = PANEL, Parent = gradeList }, { corner(8), stroke(1.5) })
+		local count = profile.cards[key]
+		textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -220, 0, 22), Text = keyName(key) .. (if count > 1 then "  x" .. count else ""), TextColor3 = nameColor(cardId, variantId), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local info = "$" .. Format.number(Config.keyIncome(key)) .. "/s"
+		if grade then
+			info ..= string.format('   <font color="#%s">%s</font>  ·  reroll: keeps the better grade', grade.color:ToHex(), grade.name)
 		end
+		textLabel({ Position = UDim2.fromOffset(10, 26), Size = UDim2.new(1, -220, 0, 18), Text = info, RichText = true, TextColor3 = Color3.fromRGB(200, 200, 215), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		local canPay = (player:GetAttribute("Cash") or 0) >= cost
+		local color = if grade then Color3.fromRGB(120, 80, 200) else GRADE_COLOR
+		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(190, 36), Text = (if grade then "REROLL $" else "GRADE $") .. Format.number(cost), BackgroundColor3 = if canPay then color else GREY }, function()
+			if grading then
+				return
+			end
+			if (player:GetAttribute("Cash") or 0) < cost then
+				toast("Not enough Cash to grade this card", RED)
+				return
+			end
+			grading = true
+			local result = remotes.Grade:InvokeServer(key)
+			if result then
+				showGrade(result)
+			end
+			grading = false
+		end).Parent = row
 	end
 	if order == 0 then
-		textLabel({ Size = UDim2.new(1, -10, 0, 30), Text = "No card to grade: graded cards can't be graded again", TextColor3 = GREY, Parent = gradeList })
+		textLabel({ Size = UDim2.new(1, -10, 0, 30), Text = "No card to grade: open some packs first", TextColor3 = GREY, Parent = gradeList })
 	end
 end
 
@@ -1143,9 +1460,15 @@ local gradeScores = create("Frame", { AnchorPoint = Vector2.new(0, 0.5), Positio
 	create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
 })
 local gradeTitle = textLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.16, 0), Size = UDim2.fromOffset(700, 44), Text = "", ZIndex = 11, Parent = gradeReveal })
-local gradeResult = textLabel({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0.5, -60, 0.48, 125), Size = UDim2.fromOffset(360, 44), Text = "", ZIndex = 12, Parent = gradeReveal })
+local gradeResult = textLabel({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0.5, -60, 0.48, 125), Size = UDim2.fromOffset(460, 44), Text = "", ZIndex = 12, Parent = gradeReveal })
 local gradeClose = button({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0.9, 0), Size = UDim2.fromOffset(160, 56), Text = "OK", BackgroundColor3 = ACCENT, ZIndex = 12 }, function()
 	gradeReveal.Visible = false
+	gradePanel.Visible = true
+end)
+-- While a grade shows, the Grading window and the top bar step aside so nothing covers it
+gradeReveal:GetPropertyChangedSignal("Visible"):Connect(function()
+	statsBar.Visible = not gradeReveal.Visible and not reveal.Visible
+	weatherLabel.Visible = statsBar.Visible
 end)
 gradeClose.Parent = gradeReveal
 
@@ -1159,6 +1482,7 @@ showGrade = function(result)
 	gradeTitle.Text = "Grading " .. displayName(cardId, variantId) .. "..."
 	gradeTitle.TextColor3 = nameColor(cardId, variantId)
 	cardFrame(gradeCardHolder, cardId, variantId, UDim2.fromScale(1, 1), 11)
+	gradePanel.Visible = false
 	gradeReveal.Visible = true
 
 	for index, criterion in Config.GRADE_CRITERIA do
@@ -1189,6 +1513,12 @@ showGrade = function(result)
 	cardFrame(gradeCardHolder, cardId, variantId, UDim2.fromScale(1, 1), 11, grade, (Config.keyTrait(result.key) or {} :: any).id)
 	gradeResult.Text = string.format("Average %.2f  ·  %s  ·  %s Cash", total / #result.scores, grade.name, Format.multiplier(grade.cash))
 	gradeResult.TextColor3 = grade.color
+	if result.kept then
+		-- A reroll that rolled worse: the card keeps its old grade
+		gradeResult.Text = string.format("Rolled %.2f: worse, your card keeps %s", total / #result.scores, grade.name)
+	elseif result.regrade then
+		gradeResult.Text = "UPGRADED!  " .. gradeResult.Text
+	end
 	local pop = create("UIScale", { Scale = if grade.grade >= 8 then 1.8 else 1.2, Parent = gradeResult })
 	TweenService:Create(pop, TweenInfo.new(0.6, Enum.EasingStyle.Elastic), { Scale = 1 }):Play()
 	gradeClose.Visible = true
@@ -1443,12 +1773,18 @@ refreshTowers = function()
 	for _, tower in Config.TOWERS do
 		local best = (profile.towers or {})[tower.id] or 0
 		local row = create("Frame", { LayoutOrder = tower.order, Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = Color3.new(1, 1, 1), Parent = towerList }, { corner(10), stroke(2), gradient(tower.color:Lerp(DARK, 0.35), tower.color:Lerp(DARK, 0.7)) })
-		textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -130, 0, 26), Text = tower.name, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		textLabel({ Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -200, 0, 26), Text = tower.name, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
 		local floors = if tower.floors then string.format("Best: %d/%d", best, tower.floors) else string.format("Best: floor %d", best)
-		textLabel({ Position = UDim2.fromOffset(10, 31), Size = UDim2.new(1, -130, 0, 19), Text = floors, TextColor3 = Color3.fromRGB(220, 220, 230), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
-		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(110, 42), Text = "ENTER", BackgroundColor3 = if #team > 0 then ACCENT else GREY }, function()
+		textLabel({ Position = UDim2.fromOffset(10, 31), Size = UDim2.new(1, -200, 0, 19), Text = floors, TextColor3 = Color3.fromRGB(220, 220, 230), TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
+		-- A fight going on in the background (hidden, see Tower.client.luau): no new one
+		local busyTower = player:GetAttribute("TowerAuto")
+		button({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(88, 42), Text = "ENTER", BackgroundColor3 = if #team > 0 and not busyTower then ACCENT else GREY }, function()
 			if #team == 0 then
 				toast("Add cards to your team first", RED)
+				return
+			end
+			if busyTower then
+				toast("Your team is already fighting: tap the swords on the right", RED)
 				return
 			end
 			for _, panel in panels do
@@ -1474,11 +1810,18 @@ end).Parent = towersPanel
 
 -- The main UI steps aside while the player is in a tower (Tower.client.luau draws the fight)
 local function refreshInTower()
-	root.Visible = player:GetAttribute("InTower") == nil and player:GetAttribute("TowerScreen") == nil
+	local inTower = player:GetAttribute("InTower") ~= nil or player:GetAttribute("TowerScreen") ~= nil
+	root.Visible = not inTower and player:GetAttribute("UpgradesOpen") == nil
+	-- While a tower fight is on screen, no "E" prompt (the tower's own JOIN among them) can fire
+	ProximityPromptService.Enabled = not inTower
 end
+player:GetAttributeChangedSignal("UpgradesOpen"):Connect(refreshInTower)
 player:GetAttributeChangedSignal("InTower"):Connect(refreshInTower)
 player:GetAttributeChangedSignal("TowerScreen"):Connect(refreshInTower)
 refreshInTower()
+player:GetAttributeChangedSignal("TowerAuto"):Connect(function()
+	refreshTowers()
+end)
 
 ---------------------------------------------------------------------------
 -- Side buttons
@@ -1486,7 +1829,7 @@ refreshInTower()
 local sideBar = create("Frame", {
 	AnchorPoint = Vector2.new(0, 0.5),
 	Position = UDim2.new(0, 14, 0.5, 0),
-	Size = UDim2.fromOffset(150, 300),
+	Size = UDim2.fromOffset(150, 360),
 	BackgroundTransparency = 1,
 	Parent = root,
 }, { create("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }) })
@@ -1496,6 +1839,56 @@ for order, entry in { { "Packs", PACKS_COLOR, "📦" }, { "Cards", CARDS_COLOR, 
 	button({ LayoutOrder = order, Size = UDim2.fromOffset(150, 56), Text = icon .. " " .. string.upper(name), BackgroundColor3 = color }, function()
 		togglePanel(name)
 	end).Parent = sideBar
+end
+
+-- Teleports: two buttons at the very top of the screen, in the row of Roblox's own buttons
+local teleportRow = create("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromOffset(0, 6), Size = UDim2.fromOffset(250, 40), BackgroundTransparency = 1, Parent = root }, {
+	create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 10) }),
+})
+-- As tall as Roblox's top row allows, so it never runs into the top bar under it
+local function placeTeleportRow()
+	local ok, inset = pcall(function()
+		return GuiService.TopbarInset.Height
+	end)
+	local height = math.clamp((if ok then inset else 0) / uiScale.Scale - 12, 34, 44)
+	teleportRow.Position = UDim2.new(0.5, 0, 0, 6)
+	teleportRow.Size = UDim2.fromOffset(250, height)
+end
+uiScale:GetPropertyChangedSignal("Scale"):Connect(placeTeleportRow)
+pcall(function()
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(placeTeleportRow)
+end)
+placeTeleportRow()
+reveal:GetPropertyChangedSignal("Visible"):Connect(function()
+	teleportRow.Visible = not reveal.Visible
+end)
+for order, entry in { { "base", "🏠 BASE", Color3.fromRGB(70, 140, 230) }, { "shop", "🛒 SHOP", SHOP_COLOR } } do
+	button({ LayoutOrder = order, Size = UDim2.new(0, 120, 1, 0), Text = entry[2], BackgroundColor3 = entry[3] }, function()
+		for _, panel in panels do
+			panel.Visible = false
+		end
+		remotes.Teleport:FireServer(entry[1])
+		local character = player.Character
+		local rootPart = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if rootPart then
+			local before = rootPart.Position
+			task.spawn(function()
+				-- Wait for the move, then put the camera behind the character so it doesn't stay
+				-- inside a booth or a wall
+				for _ = 1, 20 do
+					task.wait(0.05)
+					if (rootPart.Position - before).Magnitude > 10 then
+						break
+					end
+				end
+				local camera = Workspace.CurrentCamera
+				if camera then
+					local look = rootPart.CFrame.LookVector
+					camera.CFrame = CFrame.lookAt(rootPart.Position - look * 14 + Vector3.new(0, 7, 0), rootPart.Position + Vector3.new(0, 2, 0))
+				end
+			end)
+		end
+	end).Parent = teleportRow
 end
 
 ---------------------------------------------------------------------------

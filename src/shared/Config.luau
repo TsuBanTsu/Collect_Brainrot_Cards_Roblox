@@ -81,9 +81,10 @@ Config.CARDS = {} :: { [string]: Card }
 -- low rarities fade out and rarer ones appear as packs get more expensive.
 -- `cash` multiplies the income of the pack's cards so each new pack is worth it.
 -- Prices are set so that a player who plays actively reaches each pack in about:
--- Italian 4 min, Chaos 40 min, Sky 2 h 10, Galaxy 6 h 30, Hacker (the last one) 25 h
+-- Beach 1 min, Italian 2 min, Jungle 3 min, Kitty 5 min (a new pack every minute or two at the
+-- start), Chaos 15 min, Sky 1 h 20, Galaxy 5 h, Hacker (the last one) 25 h
 -- (tools/balance-sim.py, without offline income, towers, weather or Index bonus, which all
--- speed it up a bit). Packs 1-13 have the "Normal" brainrots, then come the Diamond, Lava,
+-- speed it up a bit). The first packs also give rarer cards more often. Packs 1-13 have the "Normal" brainrots, then come the Diamond, Lava,
 -- Galaxy and Hacker versions.
 -- Each pack lists its cards by rarity.
 ---------------------------------------------------------------------------
@@ -108,7 +109,7 @@ Config.PACKS = {
 		price = 50,
 		cash = 1,
 		color = Color3.fromRGB(120, 200, 120),
-		odds = { common = 60, uncommon = 30, rare = 9, epic = 1 },
+		odds = { common = 50, uncommon = 32, rare = 14, epic = 4 },
 		cards = {
 			common = { { id = "noobini", name = "Noobini Pizzanini" }, { id = "lirili", name = "Lirili Larila", model = "Normal/Lirili Larila" }, { id = "timcheese", name = "Tim Cheese", model = "Normal/Tim Cheese" } },
 			uncommon = { { id = "fluriflura", name = "Fluriflura", model = "Normal/Fluri Flura" }, { id = "pipikiwi", name = "Pipi Kiwi", model = "Normal/Pipi Kiwi" } },
@@ -120,10 +121,10 @@ Config.PACKS = {
 		id = "beach",
 		order = 2,
 		name = "Beach Pack",
-		price = 8200,
+		price = 1500,
 		cash = 2.9,
 		color = Color3.fromRGB(255, 215, 110),
-		odds = { common = 55, uncommon = 30, rare = 12, epic = 2.8, legendary = 0.2 },
+		odds = { common = 45, uncommon = 32, rare = 16, epic = 6, legendary = 1 },
 		cards = {
 			common = { { id = "pipipotato", name = "Pipi Potato", model = "Normal/Pipi Potato" }, { id = "bananadancana", name = "Banana Dancana", model = "Normal/Banana Dancana" } },
 			uncommon = { { id = "bambinicrostini", name = "Bambini Crostini", model = "Normal/Bambini Crostini" }, { id = "avocadiniguffo", name = "Avocadini Guffo", model = "Normal/Avocadini Guffo" } },
@@ -136,10 +137,10 @@ Config.PACKS = {
 		id = "italian",
 		order = 3,
 		name = "Italian Pack",
-		price = 22000,
+		price = 6000,
 		cash = 8,
 		color = Color3.fromRGB(80, 170, 255),
-		odds = { common = 30, uncommon = 40, rare = 25, epic = 4.5, legendary = 0.5 },
+		odds = { common = 28, uncommon = 38, rare = 24, epic = 8, legendary = 2 },
 		cards = {
 			common = { { id = "talpa", name = "Talpa di Fero", model = "Normal/Talpa Di Fero" }, { id = "svinino", name = "Svinino Bombondino", model = "Normal/Svinina Bombardino" } },
 			uncommon = { { id = "patapim", name = "Brr Brr Patapim", model = "Normal/Brr Brr Patapim" }, { id = "bananita", name = "Bananita Dolphinita", model = "Normal/Bananita Dolphinita" } },
@@ -152,10 +153,10 @@ Config.PACKS = {
 		id = "jungle",
 		order = 4,
 		name = "Jungle Pack",
-		price = 84000,
+		price = 30000,
 		cash = 9.5,
 		color = Color3.fromRGB(70, 180, 80),
-		odds = { uncommon = 55, rare = 30, epic = 12, legendary = 2.8, mythic = 0.2 },
+		odds = { uncommon = 48, rare = 32, epic = 14, legendary = 5, mythic = 1 },
 		cards = {
 			uncommon = { { id = "zibrazubrazibralini", name = "Zibra Zubra Zibralini", model = "Normal/Zibra Zubra Zibralini" }, { id = "pandaccinibananini", name = "Pandaccini Bananini", model = "Normal/Pandaccini Bananini" } },
 			rare = { { id = "tigroligrefrutonni", name = "Tigroligre Frutonni", model = "Normal/Tigroligre Frutonni" }, { id = "agarrinilapallini", name = "Agarrini La Pallini", model = "Normal/Agarrini La Pallini" } },
@@ -168,10 +169,10 @@ Config.PACKS = {
 		id = "kitty",
 		order = 5,
 		name = "Kitty Pack",
-		price = 470000,
+		price = 200000,
 		cash = 20,
 		color = Color3.fromRGB(255, 160, 205),
-		odds = { uncommon = 42, rare = 38, epic = 15.5, legendary = 4, mythic = 0.5 },
+		odds = { uncommon = 40, rare = 36, epic = 17, legendary = 6, mythic = 1 },
 		cards = {
 			uncommon = { { id = "nyanninicattalini", name = "Nyannini Cattalini", model = "Normal/Nyannini Cattalini" }, { id = "smurfogatto", name = "Smurfo Gatto", model = "Normal/Smurfo Gatto" } },
 			rare = { { id = "brribrribicusdicus", name = "Brri Brri Bicus Dicus", model = "Normal/Brri Brri Bicus Dicus" } },
@@ -184,7 +185,7 @@ Config.PACKS = {
 		id = "chaos",
 		order = 6,
 		name = "Chaos Pack",
-		price = 2900000,
+		price = 4500000,
 		cash = 60,
 		color = Color3.fromRGB(255, 110, 70),
 		odds = { uncommon = 35, rare = 45, epic = 16, legendary = 3.5, mythic = 0.5 },
@@ -200,7 +201,7 @@ Config.PACKS = {
 		id = "desert",
 		order = 7,
 		name = "Desert Pack",
-		price = 8500000,
+		price = 1.3e7,
 		cash = 55,
 		color = Color3.fromRGB(230, 185, 100),
 		odds = { rare = 55, epic = 30, legendary = 12, mythic = 2.8, secret = 0.2 },
@@ -662,7 +663,7 @@ function Config.oneIn(cardId: string, variantId: string): number
 end
 
 ---------------------------------------------------------------------------
--- Grading: a card can be graded once. It gets 4 scores from 1 to 10 and the
+-- Grading: a card gets 4 scores from 1 to 10 and the
 -- average gives its grade, which multiplies its Cash and its sell price.
 -- The grade is rolled first with `chance` (percent, total 100), then 4 scores
 -- whose average fits that grade are made up, so the odds are exactly these.
@@ -673,21 +674,28 @@ export type Grade = { grade: number, name: string, min: number, chance: number, 
 Config.GRADE_CRITERIA = { "Centering", "Corners", "Edges", "Surface" }
 
 Config.GRADES = {
-	{ grade = 10, name = "GEM MINT 10", min = 9.5, chance = 0.5, cash = 5, color = Color3.fromRGB(255, 215, 60) },
-	{ grade = 9, name = "MINT 9", min = 8.5, chance = 2, cash = 3, color = Color3.fromRGB(255, 120, 200) },
-	{ grade = 8, name = "NM-MT 8", min = 7.5, chance = 8, cash = 2, color = Color3.fromRGB(170, 110, 255) },
-	{ grade = 7, name = "NEAR MINT 7", min = 6.5, chance = 14.5, cash = 1.6, color = Color3.fromRGB(80, 170, 255) },
-	{ grade = 6, name = "EX-MT 6", min = 5.5, chance = 25, cash = 1.3, color = Color3.fromRGB(110, 220, 110) },
-	{ grade = 5, name = "EXCELLENT 5", min = 4.5, chance = 25, cash = 1.15, color = Color3.fromRGB(210, 210, 210) },
-	{ grade = 4, name = "POOR", min = 1, chance = 25, cash = 1, color = Color3.fromRGB(150, 150, 150) },
+	{ grade = 10, name = "GEM MINT 10", min = 9.5, chance = 2, cash = 5, color = Color3.fromRGB(255, 215, 60) },
+	{ grade = 9, name = "MINT 9", min = 8.5, chance = 6, cash = 3, color = Color3.fromRGB(255, 120, 200) },
+	{ grade = 8, name = "NM-MT 8", min = 7.5, chance = 14, cash = 2, color = Color3.fromRGB(170, 110, 255) },
+	{ grade = 7, name = "NEAR MINT 7", min = 6.5, chance = 20, cash = 1.6, color = Color3.fromRGB(80, 170, 255) },
+	{ grade = 6, name = "EX-MT 6", min = 5.5, chance = 23, cash = 1.3, color = Color3.fromRGB(110, 220, 110) },
+	{ grade = 5, name = "EXCELLENT 5", min = 4.5, chance = 20, cash = 1.15, color = Color3.fromRGB(210, 210, 210) },
+	{ grade = 4, name = "POOR", min = 1, chance = 15, cash = 1, color = Color3.fromRGB(150, 150, 150) },
 } :: { Grade }
 
 -- Grading a card costs GRADE_COST_SECONDS of its Cash (variant included). A grade adds about
--- +34% on average, so it pays for itself after about 15 minutes on a stand.
+-- +55% on average, so it pays for itself after about 9 minutes on a stand.
 Config.GRADE_COST_SECONDS = 300
+-- A graded card can be graded again (a reroll) for this times the price. It only keeps
+-- the new grade if it is better, so a reroll never makes a card worse.
+Config.REGRADE_COST_RATIO = 1.5
 
 function Config.gradeCost(cardId: string, variantId: string): number
 	return math.max(1, math.floor(Config.cardIncome(cardId, variantId) * Config.GRADE_COST_SECONDS))
+end
+
+function Config.regradeCost(cardId: string, variantId: string): number
+	return math.max(1, math.floor(Config.gradeCost(cardId, variantId) * Config.REGRADE_COST_RATIO))
 end
 
 function Config.gradeFromScores(scores: { number }): Grade
@@ -869,8 +877,12 @@ end
 ---------------------------------------------------------------------------
 -- Stands, Index, pity, offline income
 ---------------------------------------------------------------------------
-Config.STAND_COUNT = 8
-Config.STARTING_CASH = 150 -- enough for 3 Starter Packs
+-- Stands built on every plot; a player starts with BASE_STANDS of them and unlocks the others
+-- in the upgrade tree (Stand Builder)
+Config.STAND_COUNT = 12
+Config.BASE_STANDS = 8
+Config.WALK_SPEED = 20 -- Roblox default is 16
+Config.STARTING_CASH = 250 -- enough for 5 Starter Packs
 Config.OFFLINE_MAX_HOURS = 8
 Config.INDEX_BONUS = 0.10 -- +10% cash for each pack fully completed in the Index (normal variants)
 -- Pity: after PITY_PACKS packs of the same kind without a card of the pack's second rarest
@@ -1008,6 +1020,7 @@ Config.TOWER_START_TIME = 2 -- the arena appears and the camera gets in place
 Config.TOWER_CLASH_TIME = 1.1 -- one headbutt
 Config.TOWER_FLOOR_TIME = 1.4 -- the enemy comes in (also the pause after a boss)
 Config.TOWER_CLEAR_TIME = 0.8 -- the pause after a normal floor
+Config.TOWER_AUTO_RESTART_TIME = 3 -- autoplay: the pause before climbing again after a defeat
 
 function Config.floorKind(floor: number): FloorKind
 	if floor % Config.FLOOR_KINDS.boss.every == 0 then
@@ -1159,6 +1172,157 @@ Config.DECOR = {
 	decor_register = { id = 3559550517, height = 2.2 },
 	decor_magnifier = { id = 11935186507, size = 3 },
 } :: { [string]: { id: number, height: number?, size: number?, yaw: number? } }
+
+---------------------------------------------------------------------------
+-- Upgrade tree: lots of small upgrades bought with Cash, like Collect Cat Cards.
+-- Each tree has branches; a branch is a chain of nodes, each one needs the one before it.
+-- Node i of a branch costs `cost` x `growth`^(i-1) and adds `value` to its stat; every 4th
+-- node is a star and adds twice as much. Stats (all added up, 0 when nothing is bought):
+--   luck, shiny     multiply the chances of rare cards / of Gold, Rainbow, Holo by 1 + bonus
+--   grade           multiplies the chances of the grades 8 to 10 by 1 + bonus
+--   cash, sell      Cash of the stands / sell prices x (1 + bonus)
+--   offline         extra hours of offline income
+--   stands          extra stands (up to STAND_COUNT)
+--   openSpeed       pack openings play faster (x 1 + bonus)
+--   walk            walking speed x (1 + bonus)
+--   backpack        extra backpack slots
+--   towerHp, towerDmg, towerCash   team HP, DMG and the Cash won in the towers x (1 + bonus)
+--   autoOpen        1 = the AUTO button of the pack opening is unlocked
+---------------------------------------------------------------------------
+export type UpgradeBranch = { stat: string, value: number, cost: number, growth: number, names: { string } }
+export type UpgradeTree = { id: string, name: string, icon: string, color: Color3, branches: { UpgradeBranch } }
+export type Upgrade = { id: string, tree: string, branch: number, index: number, name: string, stat: string, value: number, cost: number, star: boolean, requires: string? }
+
+Config.UPGRADE_TREES = {
+	{
+		id = "luck",
+		name = "LUCK",
+		icon = "🍀",
+		color = Color3.fromRGB(80, 210, 90),
+		branches = {
+			{ stat = "luck", value = 0.03, cost = 300, growth = 12, names = { "Four Leaf", "Lucky Charm", "Rabbit Foot", "Horseshoe", "Lucky Star", "Wishbone", "Clover Field", "Lucky Streak", "Jackpot", "Fortune", "Destiny", "Golden Luck" } },
+			{ stat = "shiny", value = 0.03, cost = 500, growth = 12, names = { "Shiny Eye", "Glimmer", "Foil Feel", "Gold Rush", "Sparkle", "Prism Peek", "Rainbow Hunt", "Shine On", "Holo Sense", "Glitter Storm", "Radiance", "Shiny King" } },
+			{ stat = "grade", value = 0.05, cost = 2000, growth = 18, names = { "Keen Eye", "Steady Hand", "Clean Edges", "Sharp Corners", "Centered", "Magnifier", "Flawless", "Mint Touch", "Gem Eye", "Perfect Grade" } },
+		},
+	},
+	{
+		id = "cash",
+		name = "CASH",
+		icon = "💵",
+		color = Color3.fromRGB(255, 200, 60),
+		branches = {
+			{ stat = "cash", value = 0.03, cost = 200, growth = 11, names = { "Tip Jar", "Small Change", "Pay Raise", "Big Tips", "Coin Rush", "Bonus Day", "Overtime", "Gold Tips", "Fat Coins", "Piggy Bank", "Money Rain", "Golden Stand", "Rich Brain", "Cash King" } },
+			{ stat = "sell", value = 0.04, cost = 400, growth = 18, names = { "Sales Pitch", "Haggle", "Good Deal", "Bargain", "Hot Seller", "Market Stall", "Big Sale", "Auction", "Collector", "Trade King" } },
+			{ stat = "offline", value = 0.5, cost = 1000, growth = 15, names = { "Nap Time", "Night Owl", "Soft Pillow", "Cozy Blanket", "Night Shift", "Moon Glow", "Deep Sleep", "Dream On", "Hibernate", "Midnight", "Sleepwalker", "Eternal Rest" } },
+			{ stat = "stands", value = 1, cost = 5000, growth = 1000, names = { "Stand Builder", "Bigger Base", "Stand Tower", "Mega Base" } },
+		},
+	},
+	{
+		id = "speed",
+		name = "SPEED",
+		icon = "⚡",
+		color = Color3.fromRGB(255, 230, 70),
+		branches = {
+			{ stat = "openSpeed", value = 0.06, cost = 150, growth = 15, names = { "Quick Hands", "Fast Rip", "Snap Rip", "Swift Swipe", "Flick Flick", "Tear Time", "Pack Pinch", "Speedy Paws", "Whirl Wrist", "Instant Open" } },
+			{ stat = "walk", value = 0.03, cost = 100, growth = 20, names = { "Fast Feet", "Jog", "Sprint", "Light Step", "Rush", "Dash", "Zoom", "Lightning Legs" } },
+			{ stat = "backpack", value = 10, cost = 800, growth = 20, names = { "Bigger Bag", "Extra Pocket", "Stack It", "Big Pockets", "Satchel", "Stock Room", "Warehouse", "Mega Bag" } },
+		},
+	},
+	{
+		id = "power",
+		name = "POWER",
+		icon = "⚔",
+		color = Color3.fromRGB(255, 80, 90),
+		branches = {
+			{ stat = "towerHp", value = 0.04, cost = 500, growth = 13, names = { "Thick Skin", "Warm Coat", "Fluffy Tail", "Puff Stuff", "Cloud Coat", "Iron Head", "Stone Wall", "Tank", "Fortress", "Unbreakable", "Titan Hide", "Nine Lives" } },
+			{ stat = "towerDmg", value = 0.04, cost = 500, growth = 13, names = { "Headbutt", "Hard Head", "Sharp Horns", "Pounce", "Tail Whip", "Fury", "Double Bonk", "Razor Skull", "Rampage", "Smash", "Titan Bonk", "Brain Blast" } },
+			{ stat = "towerCash", value = 0.05, cost = 1000, growth = 15, names = { "Loot Sense", "Coin Sniff", "Gold Glint", "Treasure Map", "Chest Hunter", "Boss Hunter", "Loot Lord", "Dragon Hoard", "Gem Sense", "Treasure King" } },
+		},
+	},
+	{
+		id = "auto",
+		name = "AUTO OPEN",
+		icon = "📦",
+		color = Color3.fromRGB(80, 200, 255),
+		branches = {
+			{ stat = "autoOpen", value = 1, cost = 25000, growth = 1, names = { "Auto Open" } },
+		},
+	},
+} :: { UpgradeTree }
+
+Config.UPGRADES = {} :: { [string]: Upgrade }
+Config.UPGRADE_LIST = {} :: { Upgrade } -- in tree, branch and chain order
+for _, tree in Config.UPGRADE_TREES do
+	for branchIndex, branch in tree.branches do
+		local previous: string? = nil
+		for index, name in branch.names do
+			local star = index % 4 == 0
+			local node: Upgrade = {
+				id = tree.id .. "_" .. branchIndex .. "_" .. index,
+				tree = tree.id,
+				branch = branchIndex,
+				index = index,
+				name = name,
+				stat = branch.stat,
+				value = if star then branch.value * 2 else branch.value,
+				cost = math.floor(branch.cost * branch.growth ^ (index - 1)),
+				star = star,
+				requires = previous,
+			}
+			Config.UPGRADES[node.id] = node
+			table.insert(Config.UPGRADE_LIST, node)
+			previous = node.id
+		end
+	end
+end
+
+-- How each stat is written in the UI
+Config.UPGRADE_STATS = {
+	luck = "%s Luck",
+	shiny = "%s Shiny chance",
+	grade = "%s good grades",
+	cash = "%s Cash",
+	sell = "%s sell price",
+	offline = "+%s h offline income",
+	stands = "+%s stand",
+	openSpeed = "%s opening speed",
+	walk = "%s walk speed",
+	backpack = "+%s backpack slots",
+	towerHp = "%s tower HP",
+	towerDmg = "%s tower DMG",
+	towerCash = "%s tower Cash",
+	autoOpen = "Unlocks AUTO opening",
+} :: { [string]: string }
+
+-- Stats that are counts, not percents
+local FLAT_STATS = { offline = true, stands = true, backpack = true, autoOpen = true }
+
+function Config.upgradeText(stat: string, value: number): string
+	local amount = if FLAT_STATS[stat] then tostring(value) else "+" .. tostring(math.floor(value * 100 + 0.5)) .. "%"
+	return string.format(Config.UPGRADE_STATS[stat], amount)
+end
+
+-- Sum of a stat over the owned upgrades ({ [upgradeId] = true })
+function Config.upgradeBonus(owned: { [string]: boolean }?, stat: string): number
+	local total = 0
+	for id in (owned or {}) :: { [string]: boolean } do
+		local node = Config.UPGRADES[id]
+		if node and node.stat == stat then
+			total += node.value
+		end
+	end
+	return total
+end
+
+-- Stands a player can use with these upgrades
+function Config.standCount(owned: { [string]: boolean }?): number
+	return math.min(Config.STAND_COUNT, Config.BASE_STANDS + Config.upgradeBonus(owned, "stands"))
+end
+
+---------------------------------------------------------------------------
+-- Admins: they get the admin panel. The place's owner and anyone testing in Studio always do.
+---------------------------------------------------------------------------
+Config.ADMINS = {} :: { number } -- extra Roblox user ids
 
 ---------------------------------------------------------------------------
 -- Look of the world

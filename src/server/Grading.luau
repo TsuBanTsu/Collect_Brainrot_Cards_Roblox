@@ -10,16 +10,30 @@ local Grading = {}
 
 local rng = Random.new()
 
-export type Result = { key: string, scores: { number }, grade: number }
+-- `kept`: a regraded card that rolled worse than its old grade keeps the old one (`key`, `grade`);
+-- `scores` are always the ones just rolled, for the screen
+export type Result = { key: string, scores: { number }, grade: number, regrade: boolean, kept: boolean }
 
-local function rollGrade(): Config.Grade
+local function average(scores: { number }): number
+	local total = 0
+	for _, score in scores do
+		total += score
+	end
+	return total / #scores
+end
+
+-- `bonus` (upgrades) multiplies the chances of the grades 8 to 10
+local function rollGrade(bonus: number): Config.Grade
+	local function chance(grade: Config.Grade): number
+		return if grade.grade >= 8 then grade.chance * (1 + bonus) else grade.chance
+	end
 	local total = 0
 	for _, grade in Config.GRADES do
-		total += grade.chance
+		total += chance(grade)
 	end
 	local roll = rng:NextNumber() * total
 	for _, grade in Config.GRADES do
-		roll -= grade.chance
+		roll -= chance(grade)
 		if roll <= 0 then
 			return grade
 		end
@@ -50,34 +64,37 @@ local function rollScores(index: number): { number }
 	return scores
 end
 
--- Grades one card of the backpack. Returns the result, or nil and a reason
+-- Grades one card of the backpack. A graded card is graded again (cheaper) and keeps the
+-- better of its two grades. Returns the result, or nil and a reason
 function Grading.grade(player: Player, key: string): (Result?, string?)
 	local profile = PlayerData.get(player)
 	if not profile then
 		return nil, "Not ready"
 	end
-	local cardId, variantId, scores, traitId = Config.splitKey(key)
+	local cardId, variantId, oldScores, traitId = Config.splitKey(key)
 	if not Config.CARDS[cardId] or not Config.VARIANT[variantId] then
 		return nil, "Unknown card"
-	end
-	if scores then
-		return nil, "This card is already graded"
 	end
 	if (profile.Cards[key] or 0) < 1 then
 		return nil, "This card isn't in your backpack"
 	end
-	local cost = Config.gradeCost(cardId, variantId)
+	local cost = if oldScores then Config.regradeCost(cardId, variantId) else Config.gradeCost(cardId, variantId)
 	if profile.Cash < cost then
 		return nil, "Not enough Cash"
 	end
 
-	local grade = rollGrade()
+	local grade = rollGrade(PlayerData.bonus(profile, "grade"))
 	local newScores = rollScores(table.find(Config.GRADES, grade) :: number)
 	profile.Cash -= cost
+	local kept = oldScores ~= nil and average(newScores) <= average(oldScores)
+	if kept then
+		PlayerData.sync(player)
+		return { key = key, scores = newScores, grade = (Config.keyGrade(key) :: Config.Grade).grade, regrade = true, kept = true }
+	end
 	PlayerData.removeCard(profile, key, 1)
 	PlayerData.addCard(profile, cardId, variantId, newScores, traitId)
 	PlayerData.sync(player)
-	return { key = Config.cardKey(cardId, variantId, newScores, traitId), scores = newScores, grade = grade.grade }
+	return { key = Config.cardKey(cardId, variantId, newScores, traitId), scores = newScores, grade = grade.grade, regrade = oldScores ~= nil, kept = false }
 end
 
 return Grading

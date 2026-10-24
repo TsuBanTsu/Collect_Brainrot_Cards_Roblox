@@ -14,17 +14,17 @@ local PlayerData = require(script.Parent.PlayerData)
 local Towers = {}
 
 type Fighter = { key: string, cardId: string, hp: number, maxHp: number, dmg: number }
-type Run = { stopped: boolean }
+-- A run always starts on screen. During the fight the player can turn on `auto` (the tower
+-- starts again by itself after each defeat or clear, until the player leaves or turns it off)
+-- and `hidden` (the fight goes on in the background: the player is free to move and keeps
+-- playing, a button with two swords brings the fight back on screen)
+type Run = { stopped: boolean, auto: boolean, hidden: boolean, tower: Config.Tower }
 
 local runs: { [Player]: Run } = {}
 local rng = Random.new()
 local towerEvent: RemoteEvent
 local notify: (Player, string) -> ()
 local announce: (string, Color3) -> ()
-
-local function send(player: Player, event)
-	towerEvent:FireClient(player, event)
-end
 
 -- A random card of a pack; for a boss, one of its rarest cards
 local function enemyCard(packId: string, boss: boolean): string
@@ -64,10 +64,11 @@ local function reward(player: Player, profile, tower: Config.Tower, floor: numbe
 	local kind = Config.floorKind(floor)
 	local given = { cash = 0, packs = 0, pack = Config.towerPack(tower, floor), card = nil :: string?, reroll = false, first = first }
 
-	given.cash = Config.floorGold(tower, floor)
+	given.cash = Config.floorGold(tower, floor) * (1 + PlayerData.bonus(profile, "towerCash"))
 	if not first then
-		given.cash = math.max(1, math.floor(given.cash * Config.TOWER_RERUN_GOLD))
+		given.cash *= Config.TOWER_RERUN_GOLD
 	end
+	given.cash = math.max(1, math.floor(given.cash))
 
 	if kind.id == "boss" then
 		if first then
@@ -134,21 +135,23 @@ local function fighterInfo(fighters: { Fighter })
 	return list
 end
 
-local function runTower(player: Player, tower: Config.Tower, team: { string })
-	local run: Run = { stopped = false }
-	runs[player] = run
+-- One climb of the tower, from floor 1 until defeat, clear or leave. Returns the result.
+local function climb(player: Player, tower: Config.Tower, team: { string }, run: Run): string
 	local profile = PlayerData.get(player)
+	local function send(event)
+		towerEvent:FireClient(player, event)
+	end
 
 	local fighters: { Fighter } = {}
+	local hpBonus, dmgBonus = 1 + PlayerData.bonus(profile, "towerHp"), 1 + PlayerData.bonus(profile, "towerDmg")
 	for _, key in team do
 		local stats = Config.keyStats(key)
-		table.insert(fighters, { key = key, cardId = (Config.splitKey(key)), hp = stats.hp, maxHp = stats.hp, dmg = stats.dmg })
+		local hp = math.floor(stats.hp * hpBonus)
+		table.insert(fighters, { key = key, cardId = (Config.splitKey(key)), hp = hp, maxHp = hp, dmg = math.floor(stats.dmg * dmgBonus) })
 	end
 	local earned = { cash = 0, packs = 0, rerolls = 0, cards = {} }
 
-	player:SetAttribute("InTower", tower.id)
-	freeze(player, true)
-	send(player, { type = "start", tower = tower.id, team = fighterInfo(fighters), best = profile.Towers[tower.id] or 0 })
+	send({ type = "start", tower = tower.id, team = fighterInfo(fighters), best = profile.Towers[tower.id] or 0 })
 	task.wait(Config.TOWER_START_TIME)
 
 	local cleared = 0
@@ -166,7 +169,7 @@ local function runTower(player: Player, tower: Config.Tower, team: { string })
 		local kind = Config.floorKind(floor)
 		local stats = Config.enemyStats(tower, floor)
 		local enemy = { cardId = enemyCard(Config.towerPack(tower, floor), kind.id == "boss"), hp = stats.hp, maxHp = stats.hp, dmg = stats.dmg }
-		send(player, { type = "floor", floor = floor, kind = kind.id, enemy = enemy })
+		send({ type = "floor", floor = floor, kind = kind.id, enemy = enemy })
 		task.wait(Config.TOWER_FLOOR_TIME)
 
 		-- Headbutts: the front card and the enemy hit each other at the same time
@@ -184,7 +187,7 @@ local function runTower(player: Player, tower: Config.Tower, team: { string })
 			local fighter = fighters[index]
 			enemy.hp = math.max(0, enemy.hp - fighter.dmg)
 			fighter.hp = math.max(0, fighter.hp - enemy.dmg)
-			send(player, { type = "clash", fighter = index, dealt = fighter.dmg, taken = enemy.dmg, hp = fighter.hp, enemyHp = enemy.hp })
+			send({ type = "clash", fighter = index, dealt = fighter.dmg, taken = enemy.dmg, hp = fighter.hp, enemyHp = enemy.hp })
 			task.wait(Config.TOWER_CLASH_TIME)
 		end
 		if run.stopped then
@@ -204,7 +207,7 @@ local function runTower(player: Player, tower: Config.Tower, team: { string })
 				fighter.hp = math.min(fighter.maxHp, fighter.hp + math.ceil(fighter.maxHp * heal))
 			end
 		end
-		send(player, { type = "cleared", floor = floor, reward = given, team = fighterInfo(fighters) })
+		send({ type = "cleared", floor = floor, reward = given, team = fighterInfo(fighters) })
 		task.wait(if kind.id == "normal" then Config.TOWER_CLEAR_TIME else Config.TOWER_FLOOR_TIME)
 	end
 
@@ -212,10 +215,47 @@ local function runTower(player: Player, tower: Config.Tower, team: { string })
 		announce(player.DisplayName .. " cleared the " .. tower.name .. "!", tower.color)
 	end
 	if player.Parent then
-		send(player, { type = "end", result = result, floor = cleared, earned = earned })
+		-- `again`: autoplay will start a new climb
+		send({ type = "end", result = result, floor = cleared, earned = earned, again = run.auto and not run.stopped and result ~= "left" })
+		PlayerData.sync(player)
+	end
+	return result
+end
+
+-- On screen: the character waits, anchored, and the main UI steps aside (InTower). In the
+-- background: the character is free (TowerAuto, for the swords button and the Towers panel).
+local function setHidden(player: Player, run: Run, hidden: boolean)
+	run.hidden = hidden
+	freeze(player, not hidden)
+	player:SetAttribute("InTower", if hidden then nil else run.tower.id)
+	player:SetAttribute("TowerAuto", if hidden then run.tower.id else nil)
+end
+
+local function runTower(player: Player, tower: Config.Tower)
+	local run: Run = { stopped = false, auto = false, hidden = false, tower = tower }
+	runs[player] = run
+	setHidden(player, run, false)
+	while player.Parent do
+		local profile = PlayerData.get(player)
+		local team = if profile then PlayerData.validTeam(profile) else {}
+		if #team == 0 then
+			break
+		end
+		climb(player, tower, team, run)
+		if not run.auto or run.stopped then
+			break
+		end
+		-- Autoplay: a short pause, then the next climb (with the team as it is now)
+		task.wait(Config.TOWER_AUTO_RESTART_TIME)
+		if not run.auto or run.stopped then
+			break
+		end
+	end
+	if player.Parent then
 		freeze(player, false)
 		player:SetAttribute("InTower", nil)
-		PlayerData.sync(player)
+		player:SetAttribute("TowerAuto", nil)
+		towerEvent:FireClient(player, { type = "runEnd" })
 	end
 	runs[player] = nil
 end
@@ -258,13 +298,27 @@ function Towers.init(remotes: Folder, notifyFn: (Player, string) -> (), announce
 			notify(player, "Choose your team first")
 			return
 		end
-		task.spawn(runTower, player, tower, team)
+		task.spawn(runTower, player, tower)
 	end);
 
 	(remotes:WaitForChild("LeaveTower") :: RemoteEvent).OnServerEvent:Connect(function(player)
 		local run = runs[player]
 		if run then
 			run.stopped = true
+		end
+	end);
+
+	-- During a run: ("auto", on) turns autoplay on or off, ("hidden", on) sends the fight to the
+	-- background or brings it back on screen
+	(remotes:WaitForChild("TowerMode") :: RemoteEvent).OnServerEvent:Connect(function(player, mode: any, on: any)
+		local run = runs[player]
+		if not run or run.stopped or type(on) ~= "boolean" then
+			return
+		end
+		if mode == "auto" then
+			run.auto = on
+		elseif mode == "hidden" and on ~= run.hidden then
+			setHidden(player, run, on)
 		end
 	end);
 
