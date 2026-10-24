@@ -1021,26 +1021,25 @@ local function tearPack(pack: Config.Pack)
 		if packRaysNow then
 			packRaysNow:Destroy()
 		end
-		-- The top tears off bit by bit, from left to right: the torn part peels up and curls
-		-- back a little more with each bit, leaving a ragged white edge on the bag, then the
-		-- whole strip comes off
-		local top = art:FindFirstChild("Top") :: Frame
-		local line = art:FindFirstChild("TearLine") :: Frame
-		local count = PackArt.TEAR_SLICES
-		for torn = 1, count do
-			for i = 1, torn do
-				local slice = top:FindFirstChild("Slice" .. i) :: Frame
-				local peel = torn - i + 1 -- the first bits torn are the farthest up
-				TweenService:Create(slice, TweenInfo.new(0.07), { Position = UDim2.new((i - 1) / count, 0, -0.18 * peel, -peel * 2), Rotation = -peel * 5 }):Play()
+		-- The top tears off in one strip, from left to right: the torn part peels up a little
+		-- more as the tear goes, leaving a ragged white edge on the bag, then comes off
+		local duration = 0.6 / openSpeed()
+		local started = os.clock()
+		local nextTick = 0
+		local top: Frame = PackArt.setTear(art, 0)
+		while true do
+			local progress = math.min(1, (os.clock() - started) / duration)
+			-- Slow at first, then faster, like pulling foil
+			top = PackArt.setTear(art, progress * progress * (3 - 2 * progress))
+			if progress >= nextTick then
+				sfx("tick", 0.7 + progress * 0.5)
+				burst(packStage, UDim2.fromScale(progress, 0.07), Color3.new(1, 1, 1), 1, 40)
+				nextTick += 0.2
 			end
-			for _, bit in { line:FindFirstChild("Bit" .. (torn * 2 - 1)), line:FindFirstChild("Bit" .. (torn * 2)) } do
-				(bit :: Frame).Visible = true
+			if progress >= 1 then
+				break
 			end
-			if torn % 3 == 1 then
-				sfx("tick", 0.7 + torn * 0.04)
-			end
-			burst(packStage, UDim2.fromScale(torn / count, 0.07), Color3.new(1, 1, 1), 1, 40)
-			pause(0.05)
+			task.wait()
 		end
 		sfx("tear")
 		TweenService:Create(top, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.new(0.6, 0, -0.9, 0), Rotation = 25 }):Play()
