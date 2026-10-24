@@ -1143,6 +1143,8 @@ reveal:GetPropertyChangedSignal("Visible"):Connect(function()
 	GuiService.TouchControlsEnabled = not reveal.Visible
 end)
 local hotbarHidden = false
+local windowOpen = false -- a pack opening or any window is on screen
+local refreshOpenHeld: () -> () -- the OPEN PACK button, set up further down
 task.spawn(function()
 	while true do
 		local covered = reveal.Visible
@@ -1151,6 +1153,10 @@ task.spawn(function()
 		end
 		for _, tag in CollectionService:GetTagged("HideUnderUi") do
 			(tag :: BillboardGui).Enabled = not covered
+		end
+		if covered ~= windowOpen then
+			windowOpen = covered
+			refreshOpenHeld()
 		end
 		-- The Roblox hotbar would cover the bottom of the windows (on phones above all)
 		if covered ~= hotbarHidden then
@@ -1172,10 +1178,11 @@ local openHeld = button({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.ne
 	end
 end)
 openHeld.Parent = root
--- During the opening: no OPEN PACK button
-reveal:GetPropertyChangedSignal("Visible"):Connect(function()
-	openHeld.Visible = heldPack ~= nil and not reveal.Visible
-end)
+-- During an opening or while a window (shop, My Packs...) is open: no OPEN PACK button
+function refreshOpenHeld()
+	openHeld.Visible = heldPack ~= nil and not windowOpen and not reveal.Visible
+end
+reveal:GetPropertyChangedSignal("Visible"):Connect(refreshOpenHeld)
 
 local function watchTool(tool: Instance)
 	local packId = tool:IsA("Tool") and tool:GetAttribute("PackId")
@@ -1189,12 +1196,12 @@ local function watchTool(tool: Instance)
 	end)
 	t.Equipped:Connect(function()
 		heldPack = packId
-		openHeld.Visible = not reveal.Visible
+		refreshOpenHeld()
 	end)
 	t.Unequipped:Connect(function()
 		if heldPack == packId then
 			heldPack = nil
-			openHeld.Visible = false
+			refreshOpenHeld()
 		end
 	end)
 end
@@ -1217,7 +1224,7 @@ if backpackFolder then
 end
 player.CharacterAdded:Connect(function(character)
 	heldPack = nil
-	openHeld.Visible = false
+	refreshOpenHeld()
 	watchContainer(character)
 end)
 if player.Character then
