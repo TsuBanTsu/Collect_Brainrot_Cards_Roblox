@@ -335,9 +335,9 @@ Config.PACKS = {
 		cards = {
 			legendary = { { id = "diamond_agarrinilapallini", name = "Diamond Agarrini La Pallini", model = "Diamante/Diamond Agarrini La Pallini" }, { id = "diamond_trippitroppitroppatrippa", name = "Diamond Trippi Troppi Troppa Trippa", model = "Diamante/Diamond Trippi Troppi Troppa Trippa" } },
 			mythic = { { id = "diamond_brribrribicusdicus", name = "Diamond Brri Brri Bicus Dicus", model = "Diamante/Diamond Brri Brri Bicus Dicus" }, { id = "diamond_strawberrelliflamingelli", name = "Diamond Strawberrelli Flamingelli", model = "Diamante/Diamond Strawberrelli Flamingelli" } },
-			secret = { { id = "diamond_cappuccino", name = "Diamond Cappuccino Assassino", model = "Diamante/Diamond Cappuccino Assassino" } },
+			secret = { { id = "diamond_tungtung", name = "Diamond Tung Tung Tung Sahur", model = "Diamante/Diamond Tung Sahur" } },
 			divine = { { id = "diamond_cactohipopotamo", name = "Diamond Cacto Hipopotamo", model = "Diamante/Diamond Cacto Hipopotamo" } },
-			god = { { id = "diamond_tungtung", name = "Diamond Tung Tung Tung Sahur", model = "Diamante/Diamond Tung Sahur" } },
+			god = { { id = "diamond_cappuccino", name = "Diamond Cappuccino Assassino", model = "Diamante/Diamond Cappuccino Assassino" } },
 		},
 	},
 	{
