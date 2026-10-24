@@ -1822,7 +1822,10 @@ end).Parent = towersPanel
 
 -- The main UI steps aside while the player is in a tower (Tower.client.luau draws the fight)
 local function refreshInTower()
-	root.Visible = player:GetAttribute("InTower") == nil and player:GetAttribute("TowerScreen") == nil and player:GetAttribute("UpgradesOpen") == nil
+	local inTower = player:GetAttribute("InTower") ~= nil or player:GetAttribute("TowerScreen") ~= nil
+	root.Visible = not inTower and player:GetAttribute("UpgradesOpen") == nil
+	-- While a tower fight is on screen, no "E" prompt (the tower's own JOIN among them) can fire
+	ProximityPromptService.Enabled = not inTower
 end
 player:GetAttributeChangedSignal("UpgradesOpen"):Connect(refreshInTower)
 player:GetAttributeChangedSignal("InTower"):Connect(refreshInTower)
